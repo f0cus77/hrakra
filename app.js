@@ -331,6 +331,35 @@ function rack(g, x, y, w, u, day, owned, i, t) {
     for (let k = 0; k < 3; k++) { const bx = x - w * .25 + k * w * .25; g.beginPath(); for (let j = 0; j < 8; j++) { const yy = top - 8 - j * 3.5, xx = bx + Math.sin(t * 4 + j * .8 + k + i) * 2; j ? g.lineTo(xx, yy) : g.moveTo(xx, yy); } g.stroke(); }
   }
 }
+function sign(g, x, y, u, text) {
+  g.font = `800 ${11 * u}px "Baloo 2",sans-serif`; const w = g.measureText(text).width + 14 * u;
+  g.strokeStyle = '#6b4a2b'; g.lineWidth = 3 * u; g.beginPath(); g.moveTo(x, y); g.lineTo(x, y - 16 * u); g.stroke();
+  g.fillStyle = '#f6e7c4'; rrect(g, x - w / 2, y - 32 * u, w, 18 * u, 5 * u); g.fill();
+  g.strokeStyle = '#a8743f'; g.lineWidth = 1.5 * u; g.stroke();
+  g.fillStyle = '#4a2f18'; g.textAlign = 'center'; g.fillText(text, x, y - 19 * u);
+}
+function tarp(g, o, u, day, t) {
+  const kick = performance.now() - (vis.tarpKick || 0) < 300 ? Math.sin((performance.now() - vis.tarpKick) / 30) * 2 * u : 0;
+  g.fillStyle = 'rgba(0,0,0,.22)'; g.beginPath(); g.ellipse(o.x, o.y + 4 * u, o.w * .56, 9 * u, 0, 0, 6.283); g.fill();
+  g.save(); g.translate(o.x, o.y + kick * .3);
+  g.fillStyle = lc('#6b5634', '#e2bf72', day); g.beginPath(); g.moveTo(-o.w / 2, 0); g.lineTo(-o.w / 2 + 12 * u, -20 * u); g.lineTo(o.w / 2 - 12 * u, -20 * u); g.lineTo(o.w / 2, 0); g.closePath(); g.fill();
+  g.strokeStyle = lc('#5a4529', '#c49a52', day); g.lineWidth = 1.4;
+  for (let k = 1; k < 7; k++) { const f = k / 7; g.beginPath(); g.moveTo(-o.w / 2 + f * o.w, 0); g.lineTo(-o.w / 2 + 12 * u + f * (o.w - 24 * u), -20 * u); g.stroke(); }
+  const dryRatio = (S.dry + 1e-9) / (S.fresh + S.dry + 1e-9), n = Math.min(12, Math.ceil(Math.log10(1 + (S.fresh + S.dry) * 10) * 4));
+  for (let m = 0; m < n; m++) { g.fillStyle = lc('#6f9a5c', '#8b7353', clamp(dryRatio + R(m + 90) * .3 - .15)); g.beginPath(); g.ellipse(-o.w / 2 + 16 * u + R(m + 70) * (o.w - 32 * u), -4 * u - R(m + 80) * 13 * u, 5 * u, 2.2 * u, R(m) - .5, 0, 6.283); g.fill(); }
+  g.restore();
+  sign(g, o.x - o.w / 2 - 8 * u, o.y + 2 * u, u, 'Sušení');
+}
+function mortar(g, o, t) {
+  const u = o.s, k = performance.now() - (vis.mortarKick || 0) < 260 ? Math.sin((performance.now() - vis.mortarKick) / 26) : 0;
+  g.fillStyle = 'rgba(0,0,0,.3)'; g.beginPath(); g.ellipse(o.x, o.y + 1, 24 * u, 4 * u, 0, 0, 6.283); g.fill();
+  g.strokeStyle = '#8a5a32'; g.lineWidth = 5 * u; g.lineCap = 'round'; g.beginPath(); g.moveTo(o.x + 6 * u, o.y - 22 * u - k * 6 * u); g.lineTo(o.x + 18 * u, o.y - 40 * u - k * 6 * u); g.stroke();
+  g.fillStyle = grad(g, o.x - 20 * u, 0, o.x + 20 * u, 0, [[0, '#7d8790'], [.5, '#aeb7bf'], [1, '#6f7880']]);
+  g.beginPath(); g.moveTo(o.x - 21 * u, o.y - 24 * u); g.quadraticCurveTo(o.x - 20 * u, o.y, o.x, o.y); g.quadraticCurveTo(o.x + 20 * u, o.y, o.x + 21 * u, o.y - 24 * u); g.closePath(); g.fill();
+  g.fillStyle = '#5c646b'; g.beginPath(); g.ellipse(o.x, o.y - 24 * u, 21 * u, 5 * u, 0, 0, 6.283); g.fill();
+  if (S.dry > 0) { g.fillStyle = '#8b7353'; g.beginPath(); g.ellipse(o.x, o.y - 24 * u, 15 * u, 3 * u, 0, 0, 6.283); g.fill(); }
+  sign(g, o.x, o.y + 30 * u, u, 'Drcení');
+}
 function drawFarm(g, t, dt) {
   const L = LAY, u = L.u, { isDay, q, day } = dayCycle(t);
   g.fillStyle = grad(g, 0, 0, 0, H, [[0, lc('#141634', '#3fa7d6', day)], [.4, lc('#22284a', '#9bdcd2', day)], [1, lc('#10241c', '#3b8a3f', day)]]); g.fillRect(0, 0, W, H);
@@ -377,6 +406,7 @@ function drawFarm(g, t, dt) {
     draws.push({ y, f: () => person(g, x, y, u * 1.15, { walk, dir, hat: true, shirt: ['#e0533f', '#2f86c9', '#e8a92c', '#2aa58a'][i], carry: true, carryFill: full }) });
   }
   draws.sort((a, b) => a.y - b.y).forEach(d => d.f());
+  tarp(g, L.tarp, u, day, t);
   L.racks.forEach((o, i) => { if (S.lv.racks[i]) rack(g, o.x, o.y, o.w, u, day, true, i, t); else if (i === own('racks')) ghostOutline(g, o.x, o.y, o.w, 30 * u, u); });
   // leaves
   if (flows.pick > 0 && Math.random() < .06 + Math.min(.25, flows.pick * .04)) {
@@ -454,6 +484,7 @@ function drawProc(g, t, dt) {
   const spin = flows.grind > 0 ? 3 + Math.min(10, Math.log10(1 + flows.grind * 50) * 4) : 0;
   const kick = performance.now() - vis.grindKick < 400 ? 8 : 0;
   vis.grAngle += (spin + kick) * dt;
+  mortar(g, L.mortar, t);
   L.grind.forEach((o, i) => { if (S.lv.grinders[i]) grinder(g, o.x, o.y, o.s, i, t, spin || kick, true); else if (i === own('grinders')) ghostOutline(g, o.x, o.y, 90 * o.s, 100 * o.s, u); });
   // conveyor
   const B = L.belt, cy = B.y;
@@ -714,7 +745,7 @@ function resize() {
   W = r.width; H = r.height; dpr = Math.min(devicePixelRatio || 1, 2);
   cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
   const inv = $('inv').getBoundingClientRect();
-  TOP = Math.max(110, inv.bottom - r.top + 10);
+  TOP = Math.max(140, inv.bottom - r.top + 44); // leaves a row for the event ribbon
   layKey = '';
 }
 const F = fy => TOP + fy * (H - TOP - 12);
@@ -735,8 +766,10 @@ function computeLayout() {
     });
     L.racks.forEach((o, i) => {
       if (S.lv.racks[i]) { L.objs.push({ k: 'rack', i, x: o.x - o.w / 2, y: o.y - 40 * u, w: o.w, h: 44 * u }); L.pills.push({ key: 'racks' + i, kind: 'slot', id: 'racks', i, x: o.x, y: o.y - 40 * u, a: 'bottom', sm: true }); }
-      else if (i === own('racks')) L.pills.push({ key: 'racks' + i, kind: 'ghost', id: 'racks', i, x: o.x, y: o.y - 38 * u, a: 'bottom', sm: true });
+      else if (i === own('racks')) L.pills.push({ key: 'racks' + i, kind: 'ghost', id: 'racks', i, x: o.x, y: o.y - 38 * u, a: 'bottom', sm: true, nolbl: i === 2 });
     });
+    L.tarp = { x: W * .44, y: F(.25), w: 88 * u };
+    L.objs.push({ k: 'tarp', x: L.tarp.x - 50 * u, y: L.tarp.y - 30 * u, w: 100 * u, h: 44 * u });
     L.objs.push({ k: 'shed', x: L.shed.x - 34 * u, y: L.shed.y - 46 * u, w: 68 * u, h: 50 * u });
     L.pills.push({ key: 'pickers', kind: 'hub', id: 'pickers', x: L.shed.x, y: L.shed.y + 8, a: 'top' });
   } else if (tab === 'proc') {
@@ -748,6 +781,8 @@ function computeLayout() {
       if (S.lv.grinders[i]) { L.objs.push({ k: 'grind', i, x: o.x - 60 * o.s, y: o.y - 110 * o.s, w: 120 * o.s, h: 112 * o.s }); L.pills.push({ key: 'grinders' + i, kind: 'slot', id: 'grinders', i, x: o.x, y: o.y + 10, a: 'top' }); }
       else if (i === own('grinders')) L.pills.push({ key: 'grinders' + i, kind: 'ghost', id: 'grinders', i, x: o.x, y: o.y - 40 * o.s, a: 'bottom' });
     });
+    L.mortar = { x: W * .49, y: L.bench, s: u };
+    L.objs.push({ k: 'mortar', x: L.mortar.x - 26 * u, y: L.bench - 44 * u, w: 52 * u, h: 46 * u });
     L.objs.push({ k: 'belt', x: L.belt.x0, y: L.belt.y - 50 * u, w: L.belt.x1 - L.belt.x0, h: 70 * u });
     L.objs.push({ k: 'belt', x: L.crate.x - 40 * u, y: L.crate.y - 60 * u, w: 80 * u, h: 64 * u });
     L.pills.push({ key: 'packers', kind: 'hub', id: 'packers', x: (L.belt.x0 + L.belt.x1) / 2, y: L.belt.y + 26 * u, a: 'top' });
@@ -768,7 +803,7 @@ function buildPills() {
   const hot = $('hot'); hot.innerHTML = '';
   for (const p of LAY.pills) {
     const b = document.createElement('button');
-    b.className = 'pill ' + p.kind + (p.sm ? ' sm' : ''); b.dataset.key = p.key;
+    b.className = 'pill ' + p.kind + (p.sm ? ' sm' : '') + (p.nolbl ? ' nolbl' : ''); b.dataset.key = p.key;
     if (p.kind === 'hub') b.innerHTML = `<span class="ico"><svg viewBox="0 0 24 24">${ICON[p.id]}</svg></span><span>${hubLabel(p.id)} <small></small></span><i class="dot"></i>`;
     else if (p.kind === 'ghost') b.innerHTML = `<span class="plus">${PLUS}</span><span>${ghostLabel(p.id)}</span><span class="cost">${COIN}<b></b></span>`;
     else b.innerHTML = `<span class="lv"></span><span class="cost">${COIN}<b></b></span>`;
@@ -828,6 +863,36 @@ function updatePills(neck) {
   const bg = $('bags');
   if (bg) bg.querySelectorAll('button').forEach(b => { const sz = +b.dataset.b; b.classList.toggle('on', sz === S.bag); b.querySelector('small').textContent = '$' + fmt(bagPrice(sz)); });
 }
+const HINTS = {
+  harvest: { tab: 'farm', text: 'Ťukni na strom: sklizeň', at: () => { const o = LAY.objs.find(x => x.k === 'tree'); return o && [o.x + o.w / 2, o.y + 6]; } },
+  dry: { tab: 'farm', text: 'Ťukni na plachtu: sušení', at: () => { const o = LAY.objs.find(x => x.k === 'tarp'); return o && [o.x + o.w / 2, o.y - 4]; } },
+  grind: { tab: 'proc', text: 'Ťukni na hmoždíř: drcení', at: () => { const o = LAY.objs.find(x => x.k === 'mortar'); return o && [o.x + o.w / 2, o.y - 4]; } },
+  pack: { tab: 'proc', text: 'Ťukni na pás: balení', at: () => { const o = LAY.objs.find(x => x.k === 'belt'); return o && [o.x + o.w / 2, o.y + 6]; } },
+  sell: { tab: 'dist', text: 'Ťukni na stánek: prodej', at: () => { const o = LAY.objs.find(x => x.k === 'stall'); return o && [o.x + o.w / 2, o.y - 22]; } }
+};
+const TAB_NAME = { farm: 'Sad', proc: 'Dílna', dist: 'Ulice' };
+function nextNeed() {
+  if (bagsTotal() >= 1) return 'sell';
+  if (S.powder >= S.bag / 1000) return 'pack';
+  if (S.dry > .005) return 'grind';
+  if (S.fresh > .005) return 'dry';
+  return 'harvest';
+}
+function updateHint() {
+  const el = $('hint');
+  if (!S.tutDone && (S.total >= 250 || own('dealers') > 0)) { S.tutDone = 1; save(); }
+  if (S.tutDone || tab === 'emp' || !LAY) { el.className = ''; return; }
+  const H0 = HINTS[nextNeed()];
+  if (H0.tab !== tab) {
+    const b = document.querySelector(`#nav button[data-v="${H0.tab}"]`).getBoundingClientRect(), st = $('stage').getBoundingClientRect();
+    el.textContent = `Pokračuj: ${TAB_NAME[H0.tab]}`; el.className = 'on down';
+    el.style.transform = `translate(${Math.round(clamp(b.left + b.width / 2 - st.left, 70, W - 70))}px,${Math.round(H - 10)}px) translate(-50%,-100%)`;
+    return;
+  }
+  const p = H0.at(); if (!p) { el.className = ''; return; }
+  el.textContent = H0.text; el.className = 'on';
+  el.style.transform = `translate(${Math.round(clamp(p[0], 90, W - 90))}px,${Math.round(p[1])}px) translate(-50%,-100%)`;
+}
 function hubAffordable(id) {
   const u = UBY[id], o = own(id);
   if (o < u.max && unlockCost(u, o) <= S.cash) return true;
@@ -871,12 +936,12 @@ function manual(o, ev) {
       for (let k = 0; k < 10; k++) vis.fx.push({ x: T.x + (Math.random() - .5) * 40, y: T.y - 90 * T.s, vx: (Math.random() - .5) * 30, vy: 40 + Math.random() * 60, life: .7, c: '#8ec8e8', s: 2.4 });
     }
   } else if (o.k === 'shed') { openSheet('pickers'); return; }
-  else if (o.k === 'rack') {
+  else if (o.k === 'rack' || o.k === 'tarp') {
     const a = Math.min(h, S.fresh); if (a <= 0) return fail('Chybí čerstvé listí, sklízej stromy');
-    S.fresh -= a; S.dry += a / 2; txt = '+' + kg(a / 2) + ' suché';
-  } else if (o.k === 'grind') {
+    S.fresh -= a; S.dry += a / 2; txt = '+' + kg(a / 2) + ' suché'; vis.tarpKick = performance.now();
+  } else if (o.k === 'grind' || o.k === 'mortar') {
     const a = Math.min(.5 * h, S.dry); if (a <= 0) return fail('Chybí suché listí');
-    S.dry -= a; S.powder += a; txt = '+' + kg(a) + ' prášku'; vis.grindKick = performance.now();
+    S.dry -= a; S.powder += a; txt = '+' + kg(a) + ' prášku'; vis.grindKick = performance.now(); if (o.k === 'mortar') vis.mortarKick = performance.now();
   } else if (o.k === 'belt') {
     const n = Math.floor(Math.min(4 * h, S.powder / (S.bag / 1000)));
     if (n < 1) return fail(`Málo prášku na ${S.bag} g`);
@@ -1080,6 +1145,7 @@ function render(force) {
     }
     updatePills(neck);
   }
+  updateHint();
   updateSheet();
   if (force || now - lastSlow > 1000) {
     lastSlow = now; updateEmp();
@@ -1122,7 +1188,20 @@ function offline() {
 setInterval(() => { if (!document.hidden) save(); }, 5000);
 document.addEventListener('visibilitychange', () => { if (document.hidden) save(); else { last = performance.now(); offline(); } });
 addEventListener('pagehide', save);
-addEventListener('resize', () => { resize(); if (loginOn) sizeLogin(); });
+// iOS home-screen apps report a viewport shorter than the screen by the status-bar height,
+// which leaves a strip under the nav. Size the app to the physical screen there.
+function fitScreen() {
+  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const standalone = navigator.standalone || matchMedia('(display-mode: standalone)').matches;
+  const root = document.documentElement;
+  if (!ios || !standalone) { root.classList.remove('fixh'); return; }
+  const portrait = innerHeight >= innerWidth;
+  const sh = portrait ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height);
+  if (sh > innerHeight + 2) { root.style.setProperty('--appH', sh + 'px'); root.classList.add('fixh'); } else root.classList.remove('fixh');
+}
+fitScreen();
+addEventListener('orientationchange', () => setTimeout(() => { fitScreen(); resize(); }, 300));
+addEventListener('resize', () => { fitScreen(); resize(); if (loginOn) sizeLogin(); });
 // the stage can change size without a window resize (app shown, safe areas, PWA chrome): watch it directly
 if ('ResizeObserver' in window) new ResizeObserver(() => { if (!me) return; const r = $('stage').getBoundingClientRect(); if (Math.abs(r.width - W) > 1.5 || Math.abs(r.height - H) > 1.5) { resize(); render(true); } }).observe($('stage'));
 
@@ -1149,6 +1228,7 @@ function loop(now) {
 }
 
 /* ================= BOOT ================= */
+if (location.hash === '#debug') window.__k = { L: () => LAY, S: () => S, tab: () => tab };
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) navigator.serviceWorker.register('/sw.js').catch(() => {});
 (() => {
   const lastId = store.get(LK, null), p = profiles.find(x => x.id === lastId);

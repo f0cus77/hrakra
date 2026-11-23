@@ -52,7 +52,7 @@ svg{display:block}
 .chip i{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;flex:none}
 .chip i svg{width:13px;height:13px}
 .chip span{color:var(--mut);font-weight:600;font-size:12px}
-#ribbon{position:absolute;left:50%;top:calc(var(--top) + 116px);transform:translate(-50%,-8px);opacity:0;z-index:4;padding:6px 14px;border-radius:999px;font-size:13px;font-weight:700;white-space:nowrap;pointer-events:none;transition:opacity .25s var(--ease-out),transform .25s var(--ease-out)}
+#ribbon{position:absolute;left:50%;top:calc(var(--top) + 118px);transform:translate(-50%,-8px);opacity:0;z-index:4;padding:6px 14px;border-radius:999px;font-size:13px;font-weight:700;white-space:nowrap;pointer-events:none;transition:opacity .25s var(--ease-out),transform .25s var(--ease-out)}
 #ribbon.on{opacity:1;transform:translate(-50%,0)}
 #ribbon.good{background:var(--leaf);color:#13200d}
 #ribbon.bad{background:var(--clay);color:#2a0f06}
@@ -78,10 +78,16 @@ svg{display:block}
 .pill.neck::after{content:'!';position:absolute;top:-12px;right:-6px;width:22px;height:22px;border-radius:50%;background:var(--clay);color:#fff;font-size:15px;font-weight:800;display:grid;place-items:center;box-shadow:0 2px 0 var(--clay-d);animation:nudge 1.6s var(--ease-out) infinite}
 .pill.pop{animation:pillpop .26s var(--ease-out)}
 .pill.cap{opacity:.85}
+#hint{position:absolute;left:0;top:0;z-index:4;pointer-events:none;padding:8px 14px;border-radius:14px;background:var(--cream);color:var(--ink);font-weight:800;font-size:14px;white-space:nowrap;box-shadow:0 4px 0 #b9ad8c,0 8px 20px rgba(0,0,0,.35);opacity:0;transition:opacity .25s var(--ease-out)}
+#hint::after{content:'';position:absolute;left:50%;bottom:-7px;width:14px;height:14px;background:var(--cream);transform:translateX(-50%) rotate(45deg);border-radius:2px}
+#hint.on{opacity:1;animation:hintbob 1.4s var(--ease-io) infinite}
+@keyframes hintbob{50%{margin-top:-6px}}
+html.fixh,html.fixh body{height:var(--appH)}
+html.fixh #app,html.fixh #login{bottom:auto;height:var(--appH)}
 .pill.sm{font-size:13px;min-height:34px;gap:4px;padding:3px 9px 3px 3px}
 .pill.sm .lv{min-width:28px;height:28px;font-size:12px;padding:0 6px}
 .pill.sm.ghost{padding:3px 9px 3px 4px}
-.pill.sm.ghost>span:nth-child(2){display:none}
+.pill.nolbl>span:nth-child(2){display:none}
 .pill.sm .cost svg{width:14px;height:14px}
 #bags{position:absolute;display:flex;gap:6px;padding:6px;border-radius:18px;background:rgba(43,32,22,.86);border:2px solid #5a4330;box-shadow:0 4px 0 #2a1e14}
 #bags button{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;width:54px;height:64px;border-radius:12px;font-weight:800;font-size:13px;color:var(--mut);transition:transform .14s var(--ease-out),background .2s}
@@ -253,6 +259,7 @@ nav button .dot.on{display:block}
 </div>
 <div id="inv"></div>
 <div id="ribbon"></div>
+<div id="hint" role="status"></div>
 <button id="amt" aria-label="Kolik levelů kupovat najednou">×1<small>levely</small></button>
 <section id="emp" class="hidden" aria-label="Impérium"></section>
 </main>
