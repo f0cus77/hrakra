@@ -783,11 +783,13 @@ function buildPills() {
     bg.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; S.bag = +b.dataset.b; vib(6); render(true); });
     hot.appendChild(bg);
   }
-  placePills();
+  placePills(true);
+  requestAnimationFrame(() => LAY && LAY.pills.forEach(p => p.el && (p.el.style.transition = '')));
 }
-function placePills() {
+function placePills(initial) {
   for (const p of LAY.pills) {
     const el = p.el, w = el.offsetWidth, h = el.offsetHeight;
+    if (initial) el.style.transition = 'none';
     const x = clamp(p.x - w / 2, 6, W - w - 6), y = p.a === 'bottom' ? p.y - h : p.y;
     el.style.setProperty('--pos', `translate(${Math.round(x)}px,${Math.round(y)}px)`);
     el.style.transform = `translate(${Math.round(x)}px,${Math.round(y)}px)`;
@@ -1122,7 +1124,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) save(
 addEventListener('pagehide', save);
 addEventListener('resize', () => { resize(); if (loginOn) sizeLogin(); });
 // the stage can change size without a window resize (app shown, safe areas, PWA chrome): watch it directly
-if ('ResizeObserver' in window) new ResizeObserver(() => { if (me) { resize(); render(true); } }).observe($('stage'));
+if ('ResizeObserver' in window) new ResizeObserver(() => { if (!me) return; const r = $('stage').getBoundingClientRect(); if (Math.abs(r.width - W) > 1.5 || Math.abs(r.height - H) > 1.5) { resize(); render(true); } }).observe($('stage'));
 
 /* ================= LOOP ================= */
 let last = performance.now(), acc = 0;
@@ -1139,7 +1141,7 @@ function loop(now) {
       S.ev = { id: E.id, until: tn + E.dur * 1000 };
       S.nextEv = tn + E.dur * 1000 + (90 + Math.random() * 120) * 1000; vib(10);
     }
-    if (tab !== 'emp' && (cv.clientWidth !== W || cv.clientHeight !== H)) { resize(); render(true); }
+    if (tab !== 'emp' && (Math.abs(cv.clientWidth - W) > 1.5 || Math.abs(cv.clientHeight - H) > 1.5)) { resize(); render(true); }
     if (tab !== 'emp' && W && LAY) { g0.setTransform(dpr, 0, 0, dpr, 0, 0); g0.clearRect(0, 0, W, H); DRAW[tab](g0, t, dt); }
     acc += dt; if (acc > .1) { acc = 0; render(false); }
   }
