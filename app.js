@@ -1121,6 +1121,8 @@ setInterval(() => { if (!document.hidden) save(); }, 5000);
 document.addEventListener('visibilitychange', () => { if (document.hidden) save(); else { last = performance.now(); offline(); } });
 addEventListener('pagehide', save);
 addEventListener('resize', () => { resize(); if (loginOn) sizeLogin(); });
+// the stage can change size without a window resize (app shown, safe areas, PWA chrome): watch it directly
+if ('ResizeObserver' in window) new ResizeObserver(() => { if (me) { resize(); render(true); } }).observe($('stage'));
 
 /* ================= LOOP ================= */
 let last = performance.now(), acc = 0;
@@ -1137,6 +1139,7 @@ function loop(now) {
       S.ev = { id: E.id, until: tn + E.dur * 1000 };
       S.nextEv = tn + E.dur * 1000 + (90 + Math.random() * 120) * 1000; vib(10);
     }
+    if (tab !== 'emp' && (cv.clientWidth !== W || cv.clientHeight !== H)) { resize(); render(true); }
     if (tab !== 'emp' && W && LAY) { g0.setTransform(dpr, 0, 0, dpr, 0, 0); g0.clearRect(0, 0, W, H); DRAW[tab](g0, t, dt); }
     acc += dt; if (acc > .1) { acc = 0; render(false); }
   }
