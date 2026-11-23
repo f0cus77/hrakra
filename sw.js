@@ -1,5 +1,5 @@
 // Ketum Empire service worker: app shell offline, fonts cached on first use.
-const VERSION = 'ketum-v1';
+const VERSION = 'ketum-v2';
 const SHELL = ['/', '/index.html', '/manifest.webmanifest', '/app.js', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/apple-touch-icon.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(VERSION).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));

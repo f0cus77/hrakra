@@ -17,22 +17,23 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&display=swap" rel="stylesheet">
-<style>:root{--night:#0f1a1c;--night2:#162527;--jungle:#1d3b2f;--leaf:#9ad672;--leaf-d:#5f9a45;--gold:#ffc857;--gold-d:#c98d1c;--clay:#ef7a55;--clay-d:#a8442a;--cream:#f6f0de;--ink:#20160c;--mut:rgba(246,240,222,.62);--glass:rgba(12,22,24,.72);--line:rgba(246,240,222,.12);--font:'Baloo 2',ui-rounded,system-ui,-apple-system,'Segoe UI',sans-serif;--ease-out:cubic-bezier(.23,1,.32,1);--ease-drawer:cubic-bezier(.32,.72,0,1);--ease-io:cubic-bezier(.77,0,.175,1);--sat:env(safe-area-inset-top);--sab:env(safe-area-inset-bottom)}
+<style>:root{--night:#0f1a1c;--night2:#162527;--jungle:#1d3b2f;--leaf:#9ad672;--leaf-d:#5f9a45;--gold:#ffc857;--gold-d:#c98d1c;--clay:#ef7a55;--clay-d:#a8442a;--cream:#f6f0de;--ink:#20160c;--mut:rgba(246,240,222,.62);--glass:rgba(12,22,24,.72);--line:rgba(246,240,222,.12);--font:'Baloo 2',ui-rounded,system-ui,-apple-system,'Segoe UI',sans-serif;--ease-out:cubic-bezier(.23,1,.32,1);--ease-drawer:cubic-bezier(.32,.72,0,1);--ease-io:cubic-bezier(.77,0,.175,1);--sat:max(env(safe-area-inset-top),0px);--sab:env(safe-area-inset-bottom);--top:calc(var(--sat) + 18px)}
 *{box-sizing:border-box}
-html{-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%;overscroll-behavior:none;background:var(--night)}
+html{-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%;overscroll-behavior:none;background:#0b1415;height:100%}
 html,body{margin:0;height:100%;overflow:hidden}
+body{position:fixed;inset:0;background:#0b1415}
 body{font-family:var(--font);color:var(--cream);font-variant-numeric:tabular-nums;font-size:16px;line-height:1.35}
 button,[role=button]{font-family:inherit;color:inherit;border:0;background:none;padding:0;cursor:pointer;touch-action:manipulation;user-select:none;-webkit-user-select:none}
 input{font-family:inherit;font-size:16px}
 svg{display:block}
 :focus-visible{outline:3px solid var(--gold);outline-offset:2px;border-radius:12px}
 .hidden{display:none!important}
-#app{position:fixed;inset:0;height:100dvh;display:flex;flex-direction:column}
+#app{position:fixed;top:0;right:0;bottom:0;left:0;display:flex;flex-direction:column}
 #stage{position:relative;flex:1;overflow:hidden;touch-action:none;background:var(--night)}
 #cv{position:absolute;inset:0;width:100%;height:100%;display:block}
 #hot{position:absolute;inset:0;pointer-events:none}
 #hot>*{pointer-events:auto}
-#hud{position:absolute;left:0;right:0;top:0;padding:calc(var(--sat) + 10px) 12px 26px;display:flex;justify-content:space-between;align-items:flex-start;gap:8px;z-index:5;pointer-events:none;background:linear-gradient(rgba(10,18,20,.78),rgba(10,18,20,.45) 60%,transparent)}
+#hud{position:absolute;left:0;right:0;top:0;padding:var(--top) 12px 26px;display:flex;justify-content:space-between;align-items:flex-start;gap:8px;z-index:5;pointer-events:none;background:linear-gradient(rgba(10,18,20,.78),rgba(10,18,20,.45) 60%,transparent)}
 #hud>*{pointer-events:auto}
 .cashbox{display:flex;flex-direction:column;align-items:flex-start;gap:2px}
 .cash{display:flex;align-items:center;gap:8px;padding:4px 14px 4px 5px;border-radius:999px;background:var(--glass);border:1px solid var(--line);font-weight:800;font-size:24px;line-height:1.1;letter-spacing:-.01em}
@@ -46,12 +47,12 @@ svg{display:block}
 .heatbtn small{display:block;font-size:11px;font-weight:600;color:var(--mut)}
 .avatar{width:44px;height:44px;border-radius:50%;background:var(--jungle);border:2px solid var(--leaf);font-weight:800;font-size:18px;display:grid;place-items:center;flex:none;transition:transform .14s var(--ease-out)}
 .avatar:active{transform:scale(.95)}
-#inv{position:absolute;left:10px;right:10px;top:calc(var(--sat) + 92px);display:flex;gap:5px;z-index:4;pointer-events:none;flex-wrap:nowrap;overflow:hidden}
+#inv{position:absolute;left:10px;right:10px;top:calc(var(--top) + 82px);display:flex;gap:5px;z-index:4;pointer-events:none;flex-wrap:nowrap;overflow:hidden}
 .chip{display:flex;align-items:center;gap:5px;padding:3px 9px 3px 4px;border-radius:999px;background:rgba(10,18,20,.6);border:1px solid var(--line);font-size:13px;font-weight:700;white-space:nowrap}
 .chip i{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;flex:none}
 .chip i svg{width:13px;height:13px}
 .chip span{color:var(--mut);font-weight:600;font-size:12px}
-#ribbon{position:absolute;left:50%;top:calc(var(--sat) + 124px);transform:translate(-50%,-8px);opacity:0;z-index:4;padding:6px 14px;border-radius:999px;font-size:13px;font-weight:700;white-space:nowrap;pointer-events:none;transition:opacity .25s var(--ease-out),transform .25s var(--ease-out)}
+#ribbon{position:absolute;left:50%;top:calc(var(--top) + 116px);transform:translate(-50%,-8px);opacity:0;z-index:4;padding:6px 14px;border-radius:999px;font-size:13px;font-weight:700;white-space:nowrap;pointer-events:none;transition:opacity .25s var(--ease-out),transform .25s var(--ease-out)}
 #ribbon.on{opacity:1;transform:translate(-50%,0)}
 #ribbon.good{background:var(--leaf);color:#13200d}
 #ribbon.bad{background:var(--clay);color:#2a0f06}
@@ -77,6 +78,11 @@ svg{display:block}
 .pill.neck::after{content:'!';position:absolute;top:-12px;right:-6px;width:22px;height:22px;border-radius:50%;background:var(--clay);color:#fff;font-size:15px;font-weight:800;display:grid;place-items:center;box-shadow:0 2px 0 var(--clay-d);animation:nudge 1.6s var(--ease-out) infinite}
 .pill.pop{animation:pillpop .26s var(--ease-out)}
 .pill.cap{opacity:.85}
+.pill.sm{font-size:13px;min-height:34px;gap:4px;padding:3px 9px 3px 3px}
+.pill.sm .lv{min-width:28px;height:28px;font-size:12px;padding:0 6px}
+.pill.sm.ghost{padding:3px 9px 3px 4px}
+.pill.sm.ghost>span:nth-child(2){display:none}
+.pill.sm .cost svg{width:14px;height:14px}
 #bags{position:absolute;display:flex;gap:6px;padding:6px;border-radius:18px;background:rgba(43,32,22,.86);border:2px solid #5a4330;box-shadow:0 4px 0 #2a1e14}
 #bags button{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;width:54px;height:64px;border-radius:12px;font-weight:800;font-size:13px;color:var(--mut);transition:transform .14s var(--ease-out),background .2s}
 #bags button:active{transform:scale(.95)}
@@ -87,14 +93,14 @@ svg{display:block}
 #amt{position:absolute;right:12px;bottom:12px;z-index:4;min-width:56px;height:48px;padding:0 14px;border-radius:999px;background:var(--cream);color:var(--ink);font-weight:800;font-size:17px;box-shadow:0 3px 0 #b9ad8c,0 6px 16px rgba(0,0,0,.4);transition:transform .14s var(--ease-out)}
 #amt:active{transform:scale(.95)}
 #amt small{display:block;font-size:10px;font-weight:700;color:#6b5f45;line-height:1;margin-top:-2px}
-nav{display:flex;gap:6px;padding:8px 10px calc(var(--sab) + 8px);background:#0b1415;border-top:1px solid var(--line);z-index:6}
+nav{flex:none;display:flex;gap:6px;padding:8px 10px max(calc(var(--sab) - 6px),8px);background:#0b1415;border-top:1px solid var(--line);z-index:6}
 nav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:1px;padding:6px 0 4px;border-radius:16px;font-size:12px;font-weight:700;color:var(--mut);position:relative;min-height:52px;transition:transform .14s var(--ease-out),background .2s,color .2s}
 nav button:active{transform:scale(.95)}
 nav button svg{width:26px;height:26px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 nav button.on{background:var(--jungle);color:var(--cream);box-shadow:inset 0 -3px 0 var(--leaf)}
 nav button .dot{position:absolute;top:6px;left:calc(50% + 10px);width:10px;height:10px;border-radius:50%;background:var(--gold);box-shadow:0 0 0 2px #0b1415;display:none}
 nav button .dot.on{display:block}
-#emp{position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;background:radial-gradient(120% 60% at 50% 0%,#1d3b2f,var(--night) 70%);padding:calc(var(--sat) + 16px) 16px 32px;z-index:7;touch-action:pan-y;overscroll-behavior:contain}
+#emp{position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;background:radial-gradient(120% 60% at 50% 0%,#1d3b2f,var(--night) 70%);padding:calc(var(--top) + 6px) 16px 32px;z-index:7;touch-action:pan-y;overscroll-behavior:contain}
 #emp h2{font-size:22px;font-weight:800;margin:22px 4px 10px;letter-spacing:-.01em}
 .prof{display:flex;align-items:center;gap:12px;padding:12px;border-radius:20px;background:rgba(246,240,222,.06);border:1px solid var(--line)}
 .prof .avatar{width:52px;height:52px;font-size:22px}
@@ -168,9 +174,9 @@ nav button .dot.on{display:block}
 @starting-style{.toast{opacity:0;transform:translate(-50%,12px)}
 }
 .shake{animation:shake .4s var(--ease-io)}
-#login{position:fixed;inset:0;z-index:40;display:flex;flex-direction:column;justify-content:flex-end;height:100dvh;overflow-y:auto;background:var(--night);touch-action:pan-y}
+#login{position:fixed;top:0;right:0;bottom:0;left:0;z-index:40;display:flex;flex-direction:column;justify-content:flex-end;overflow-y:auto;background:var(--night);touch-action:pan-y}
 #lcv{position:fixed;inset:0;width:100%;height:100%;pointer-events:none}
-.lbox{position:relative;padding:24px 20px calc(var(--sab) + 24px);max-width:460px;width:100%;margin:0 auto}
+.lbox{position:relative;padding:calc(var(--top) + 8px) 20px calc(var(--sab) + 24px);max-width:460px;width:100%;margin:0 auto}
 .logo{font-weight:800;font-size:54px;line-height:.9;letter-spacing:-.03em;margin:0;color:var(--cream);text-shadow:0 4px 0 rgba(0,0,0,.35)}
 .logo span{display:block;color:var(--leaf);font-size:30px;letter-spacing:-.01em}
 .tag{margin:10px 0 20px;color:var(--mut);font-size:16px;max-width:34ch}
