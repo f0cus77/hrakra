@@ -337,8 +337,8 @@ function kratomSprite(i, lv, ripe, day, s) {
   g.globalAlpha = 1;
   // branches
   const nb = 5 + Math.min(4, Math.floor(Math.log2(1 + lv)));
-  const big = [lc('#143220', '#2a6e38', day), lc('#1d4529', '#46984c', day)];
-  const young = [lc('#28502a', '#74bd52', day), lc('#33602f', '#a5e07a', day)];
+  const big = [lc('#17402a', '#33904a', day), lc('#22573a', '#5cbd5e', day)];
+  const young = [lc('#2e5c30', '#86cc5c', day), lc('#3a6c36', '#b6ea8a', day)];
   const vein = lc(lc(VEIN[i][0], VEIN[i][1], .25 + day * .75), lc('#1d4529', '#46984c', day), .3);
   const leaves = [];
   for (let b = 0; b < nb; b++) {
