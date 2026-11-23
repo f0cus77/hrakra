@@ -2,7 +2,7 @@
 <html lang="cs">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover,interactive-widget=resizes-content">
 <meta name="theme-color" media="(prefers-color-scheme: light)" content="#0f1a1c">
 <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0f1a1c">
 <meta name="description" content="Idle tycoon z malajské džungle: od sazenice po impérium.">
@@ -19,11 +19,15 @@
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&display=swap" rel="stylesheet">
 <style>:root{--night:#0f1a1c;--night2:#162527;--jungle:#1d3b2f;--leaf:#9ad672;--leaf-d:#5f9a45;--gold:#ffc857;--gold-d:#c98d1c;--clay:#ef7a55;--clay-d:#a8442a;--cream:#f6f0de;--ink:#20160c;--mut:rgba(246,240,222,.62);--glass:rgba(12,22,24,.72);--line:rgba(246,240,222,.12);--font:'Baloo 2',ui-rounded,system-ui,-apple-system,'Segoe UI',sans-serif;--ease-out:cubic-bezier(.23,1,.32,1);--ease-drawer:cubic-bezier(.32,.72,0,1);--ease-io:cubic-bezier(.77,0,.175,1);--sat:max(env(safe-area-inset-top),0px);--sab:env(safe-area-inset-bottom);--top:calc(var(--sat) + 18px)}
 *{box-sizing:border-box}
-html{-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%;overscroll-behavior:none;background:#0b1415;height:100%}
+*{-webkit-tap-highlight-color:rgba(0,0,0,0);touch-action:pan-x pan-y}
+html,body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+input,textarea{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default}
+img,svg,canvas{-webkit-user-drag:none}
+html{-webkit-text-size-adjust:100%;overscroll-behavior:none;background:#0b1415;height:100%}
 html,body{margin:0;height:100%;overflow:hidden}
 body{position:fixed;inset:0;background:#0b1415}
 body{font-family:var(--font);color:var(--cream);font-variant-numeric:tabular-nums;font-size:16px;line-height:1.35}
-button,[role=button]{font-family:inherit;color:inherit;border:0;background:none;padding:0;cursor:pointer;touch-action:manipulation;user-select:none;-webkit-user-select:none}
+button,[role=button]{font-family:inherit;color:inherit;border:0;background:none;padding:0;cursor:pointer}
 input{font-family:inherit;font-size:16px}
 svg{display:block}
 :focus-visible{outline:3px solid var(--gold);outline-offset:2px;border-radius:12px}

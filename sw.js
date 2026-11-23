@@ -1,7 +1,7 @@
 // Ketum Empire service worker.
 // Own files: network first (updates show up on the next launch), cache only as offline fallback.
 // Google Fonts: cache first.
-const VERSION = 'ketum-v5';
+const VERSION = 'ketum-v6';
 const SHELL = ['/', '/index.html', '/manifest.webmanifest', '/app.js', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/apple-touch-icon.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(VERSION).then(c => c.addAll(SHELL.map(u => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));

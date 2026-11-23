@@ -1446,6 +1446,23 @@ function loop(now) {
 }
 
 /* ================= BOOT ================= */
+// touch hygiene for the phone: no pinch / double-tap zoom, no text selection, no long-press menus
+(() => {
+  const stop = e => e.preventDefault(), opt = { passive: false };
+  const el = e => (e.target && e.target.nodeType === 1 ? e.target : e.target && e.target.parentElement) || document.body;
+  const typing = e => !!el(e).closest('input,textarea');
+  ['gesturestart', 'gesturechange', 'gestureend'].forEach(t => document.addEventListener(t, stop, opt));
+  document.addEventListener('touchmove', e => { if (e.touches.length > 1) e.preventDefault(); }, opt);
+  document.addEventListener('dblclick', stop, opt);
+  document.addEventListener('contextmenu', e => { if (!typing(e)) e.preventDefault(); });
+  document.addEventListener('selectstart', e => { if (!typing(e)) e.preventDefault(); });
+  // a quick second tap on plain text/background would zoom on older iOS; buttons and the scene keep their taps
+  let lastEnd = 0;
+  document.addEventListener('touchend', e => {
+    const now = e.timeStamp, quick = now - lastEnd < 320; lastEnd = now;
+    if (quick && e.touches.length === 0 && !el(e).closest('button,a,input,textarea,select,label,[data-p],[data-i],[data-u],#stage,#scrim,#ov')) e.preventDefault();
+  }, opt);
+})();
 // pill widths depend on the web font: re-measure once it has loaded
 if (document.fonts) { document.fonts.ready.then(() => { layKey = ''; }); document.fonts.addEventListener && document.fonts.addEventListener('loadingdone', () => { layKey = ''; }); }
 if (location.hash === '#debug') window.__k = { L: () => LAY, S: () => S, tab: () => tab };
