@@ -116,17 +116,36 @@ function slotRate(id, L) { return lvPow(L) * UBY[id].r0 * umult(id); }
 function lvCost(u, L, n) { const c0 = u.base * Math.pow(u.k, L - 1); return c0 * (Math.pow(u.k, n) - 1) / (u.k - 1); }
 function lvMax(u, L) { const c0 = u.base * Math.pow(u.k, L - 1); return Math.max(0, Math.floor(Math.log(S.cash * (u.k - 1) / c0 + 1) / Math.log(u.k))); }
 function unlockCost(u, i) { return u.base * (i === 0 ? 1 : Math.pow(u.sm, i)); }
-// all displayed numbers are whole: full integers up to 999 999, then integer + suffix (1 250K, 3 400M …)
+// numbers stay short: full integers below 10 000, then 3 significant digits + suffix (10k, 12,5k, 147k, 1,25M …)
 const grp = n => Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0');
+const SUF = ['k', 'M', 'B', 'T', 'Qa', 'Qi', 'Sx', 'Sp', 'Oc', 'No', 'Dc'];
+// 3 significant digits, cut (not rounded) so a balance never looks bigger than it is
+function sig3(m) {
+  const d = m >= 100 ? 0 : m >= 10 ? 1 : 2, p = Math.pow(10, d);
+  let t = (Math.floor(m * p + 1e-7) / p).toFixed(d);
+  if (d) t = t.replace(/\.?0+$/, '');
+  return t.replace('.', ',');
+}
+function short(n, units) {
+  let i = -1, m = n;
+  while (m >= 1000 && i < units.length - 1) { m /= 1000; i++; }
+  return i < 0 ? sig3(m) : (m >= 1000 ? grp(m) : sig3(m)) + units[i];
+}
 function fmt(n) {
   if (!isFinite(n)) return '∞';
-  if (Math.round(n) < 1e6) return grp(Math.max(0, n));
-  const u = ['K', 'M', 'B', 'T', 'Qa', 'Qi', 'Sx', 'Oc', 'No']; let i = 0, m = n / 1000;
-  while (Math.round(m) >= 1e6 && i < u.length - 1) { m /= 1000; i++; }
-  return grp(m) + u[i];
+  if (n < 1e4) return grp(Math.max(0, Math.min(9999, n)));
+  return short(n, SUF);
 }
-// under 1 kg switch to grams so small amounts stay whole numbers
-const kg = n => n > 0 && Math.round(n * 1000) < 1000 ? grp(n * 1000) + ' g' : fmt(n) + ' kg';
+// grams under 1 kg, whole kg under 1 t, then tonnes: 1,25 t · 12,5 t · 340 t · 1,2 kt · 5,6 Mt
+function kg(n) {
+  if (!isFinite(n)) return '∞';
+  if (n > 0 && Math.round(n * 1000) < 1000) return grp(n * 1000) + '\u00a0g';
+  if (n < 1000) return grp(Math.max(0, Math.min(999, n))) + '\u00a0kg';
+  const t = n / 1000;
+  if (t < 1000) return sig3(t) + '\u00a0t';
+  const w = short(t, [' kt', ' Mt', ' Gt']);
+  return w.replace(' ', '\u00a0');
+}
 const rm = n => '$' + fmt(n);
 const pct = m => m === 1 ? 'základ' : '+' + Math.round((m - 1) * 100) + '\u00a0%';
 const fint = n => fmt(Math.floor(n));
