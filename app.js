@@ -51,16 +51,26 @@ const UNAMES = {
   couriers: ['Dodávky bez loga', 'GPS trasy', 'Sklady u dálnice', 'Přístavní kontakty', 'Nákladní lodě', 'Letecké zásilky']
 };
 const TIER = [12, 180, 3e3, 6e4, 1.5e6, 4e7];
-UNITS.forEach(u => UNAMES[u.id].forEach((nm, i) => UPG.push({ id: u.id + i, name: nm, desc: `${u.title}: rychlost ×2`, cost: u.base * TIER[i] * (i + 1), kind: 'unit', t: u.id })));
-[['Zip-lock sáčky', 400], ['Vlastní značka', 12e3], ['Kapsle', 4e5], ['Export do Thajska', 1.5e7], ['Prémiový Red Vein mix', 6e8], ['Dárková balení', 3e10]]
-  .forEach(([n, c], i) => UPG.push({ id: 'price' + i, name: n, desc: 'Prodejní cena +50 %', cost: c, kind: 'price' }));
-[['Úplatek místnímu policistovi', 2500], ['Krycí čajovna', 7e4], ['Právník v Ipohu', 2.5e6], ['Kontakt u policie', 1.2e8], ['Kamarád na ministerstvu', 7e9]]
-  .forEach(([n, c], i) => UPG.push({ id: 'heat' + i, name: n, desc: 'Heat −30 %, rychlejší vychladnutí', cost: c, kind: 'heat' }));
-[['Pracovní rukavice', 60], ['Ostrá mačeta', 2500], ['Silná kopi', 1.2e5], ['Nářadí z Japonska', 6e6]]
-  .forEach(([n, c], i) => UPG.push({ id: 'hand' + i, name: n, desc: 'Ruční práce ×3', cost: c, kind: 'hand' }));
-[['Prořezávání', 300], ['Starší stromy', 3e4], ['Opory větví', 3e6], ['Šlechtění', 3e8]]
-  .forEach(([n, c], i) => UPG.push({ id: 'cap' + i, name: n, desc: 'Kapacita listí na stromě ×2', cost: c, kind: 'cap' }));
-UPG.sort((a, b) => a.cost - b.cost);
+// empire upgrades are endless levels: the first steps keep the old prices, then each level gets pricier by `ext`
+UNITS.forEach(u => UPG.push({ id: 'u_' + u.id, kind: 'unit', t: u.id, names: UNAMES[u.id], tab: TIER.map((t, i) => u.base * t * (i + 1)), ext: 30,
+  eff: n => `${u.title}: rychlost ×2 · teď ×${fmt(Math.pow(2, n))}` }));
+UPG.push(
+  { id: 'price', kind: 'price', names: ['Zip-lock sáčky', 'Vlastní značka', 'Kapsle', 'Export do Thajska', 'Prémiový Red Vein mix', 'Dárková balení'], tab: [400, 12e3, 4e5, 1.5e7, 6e8, 3e10], ext: 45,
+    eff: n => `Prodejní cena +50 % · teď +${fmt((Math.pow(1.5, n) - 1) * 100)}\u00a0%` },
+  { id: 'heat', kind: 'heat', names: ['Úplatek místnímu policistovi', 'Krycí čajovna', 'Právník v Ipohu', 'Kontakt u policie', 'Kamarád na ministerstvu'], tab: [2500, 7e4, 2.5e6, 1.2e8, 7e9], ext: 50,
+    eff: n => `Heat −30 %, rychlejší vychladnutí · teď −${Math.round((1 - Math.pow(.7, n)) * 100)} %` },
+  { id: 'hand', kind: 'hand', names: ['Pracovní rukavice', 'Ostrá mačeta', 'Silná kopi', 'Nářadí z Japonska'], tab: [60, 2500, 1.2e5, 6e6], ext: 50,
+    eff: n => `Ruční práce ×3 · teď ×${fmt(Math.pow(3, n))}` },
+  { id: 'cap', kind: 'cap', names: ['Prořezávání', 'Starší stromy', 'Opory větví', 'Šlechtění'], tab: [300, 3e4, 3e6, 3e8], ext: 100,
+    eff: n => `Kapacita listí na stromě ×2 · teď ×${fmt(Math.pow(2, n))}` });
+const UPBY = Object.fromEntries(UPG.map(u => [u.id, u]));
+const ROMAN = ['', '', ' II', ' III', ' IV', ' V', ' VI', ' VII', ' VIII', ' IX', ' X'];
+const upLv = id => (S.ul && S.ul[id]) | 0;
+function upCost(up, n) {
+  const tb = up.tab; if (n < tb.length) return tb[n];
+  return tb[tb.length - 1] * Math.pow(up.ext, n - tb.length + 1) * (up.kind === 'unit' ? (n + 1) / tb.length : 1);
+}
+function upName(up, n) { const k = up.names.length, r = Math.floor(n / k) + 1; return up.names[n % k] + (r > 1 ? (ROMAN[r] || ' ' + r) : ''); }
 
 const EVENTS = [
   { id: 'monsoon', txt: 'Monzun — sušení −50 %', dur: 60, cls: 'bad' },
@@ -74,24 +84,27 @@ const EVENTS = [
 const fresh = () => ({
   cash: 15, onTree: 3, fresh: 0, dry: 0, powder: 0, b25: 0, b50: 0, b100: 0, bag: 50,
   lv: { trees: [1, 0, 0, 0], pickers: [0, 0, 0, 0], racks: [0, 0, 0], grinders: [0, 0], packers: [0, 0, 0], dealers: [0, 0, 0, 0, 0], couriers: [0, 0] },
-  upg: {}, loc: 0, heat: 0, layUntil: 0, layCd: 0, ev: null, nextEv: Date.now() + 120e3,
+  upg: {}, ul: {}, loc: 0, heat: 0, layUntil: 0, layCd: 0, ev: null, nextEv: Date.now() + 120e3,
   total: 0, taps: 0, raids: 0, sold: 0, bagsSold: 0, start: Date.now(), t: Date.now()
 });
 let S = fresh();
 let buyAmt = 1, ipsEma = 0, tab = 'farm';
 
 /* ================= MATH ================= */
-const cnt = kind => UPG.reduce((a, u) => a + (S.upg[u.id] && u.kind === kind ? 1 : 0), 0);
+const cnt = kind => upLv(kind);
 const evOn = id => S.ev && S.ev.id === id && Date.now() < S.ev.until;
 const MS_MULT = 1.75;
 const lvPow = L => L > 0 ? L * Math.pow(MS_MULT, Math.floor(L / MS)) : 0;
 const own = id => S.lv[id].filter(l => l > 0).length;
-const power = id => S.lv[id].reduce((a, L) => a + lvPow(L), 0);
+// a slot costs more the later it is, and pays back in output: level prices scale with the slot's own price
+const LAM = .2, GAM = .4;
+const costM = (u, i) => i === 0 ? 1 : LAM * Math.pow(u.sm, i);
+const slotM = (u, i) => Math.pow(costM(u, i), GAM);
+const power = id => S.lv[id].reduce((a, L, i) => a + slotM(UBY[id], i) * lvPow(L), 0);
 const lvSum = id => S.lv[id].reduce((a, L) => a + L, 0);
 function umult(id) {
   let m = 1;
-  for (const u of UPG) if (u.t === id && S.upg[u.id]) m *= 2;
-  return m * LOCS[S.loc].mult;
+  return Math.pow(2, upLv('u_' + id)) * LOCS[S.loc].mult;
 }
 const handMult = () => Math.pow(3, cnt('hand')) * LOCS[S.loc].mult;
 const priceKg = () => PRICE_KG * LOCS[S.loc].price * Math.pow(1.5, cnt('price')) * (evOn('buyer') ? 2 : 1);
@@ -112,39 +125,30 @@ function caps() {
   };
 }
 function unitRate(id) { return power(id) * UBY[id].r0 * umult(id); }
-function slotRate(id, L) { return lvPow(L) * UBY[id].r0 * umult(id); }
-function lvCost(u, L, n) { const c0 = u.base * Math.pow(u.k, L - 1); return c0 * (Math.pow(u.k, n) - 1) / (u.k - 1); }
-function lvMax(u, L) { const c0 = u.base * Math.pow(u.k, L - 1); return Math.max(0, Math.floor(Math.log(S.cash * (u.k - 1) / c0 + 1) / Math.log(u.k))); }
+function slotRate(id, L, i) { return slotM(UBY[id], i) * lvPow(L) * UBY[id].r0 * umult(id); }
+function lvCost(u, L, n, i) { const c0 = u.base * costM(u, i) * Math.pow(u.k, L - 1); return c0 * (Math.pow(u.k, n) - 1) / (u.k - 1); }
+function lvMax(u, L, i) { const c0 = u.base * costM(u, i) * Math.pow(u.k, L - 1); return Math.max(0, Math.floor(Math.log(S.cash * (u.k - 1) / c0 + 1) / Math.log(u.k))); }
 function unlockCost(u, i) { return u.base * (i === 0 ? 1 : Math.pow(u.sm, i)); }
-// numbers stay short: full integers below 10 000, then 3 significant digits + suffix (10k, 12,5k, 147k, 1,25M …)
+// every number is whole: full below 10 000, then a whole number + suffix kept under 10 000 (12k, 147k, 1 250k, 25M …)
 const grp = n => Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0');
 const SUF = ['k', 'M', 'B', 'T', 'Qa', 'Qi', 'Sx', 'Sp', 'Oc', 'No', 'Dc'];
-// 3 significant digits, cut (not rounded) so a balance never looks bigger than it is
-function sig3(m) {
-  const d = m >= 100 ? 0 : m >= 10 ? 1 : 2, p = Math.pow(10, d);
-  let t = (Math.floor(m * p + 1e-7) / p).toFixed(d);
-  if (d) t = t.replace(/\.?0+$/, '');
-  return t.replace('.', ',');
-}
+// cut, never rounded up, so a balance never looks bigger than it is
 function short(n, units) {
   let i = -1, m = n;
-  while (m >= 1000 && i < units.length - 1) { m /= 1000; i++; }
-  return i < 0 ? sig3(m) : (m >= 1000 ? grp(m) : sig3(m)) + units[i];
+  while (m >= 1e4 && i < units.length - 1) { m /= 1000; i++; }
+  return grp(Math.floor(m + 1e-9)) + (i < 0 ? '' : units[i]);
 }
 function fmt(n) {
   if (!isFinite(n)) return '∞';
   if (n < 1e4) return grp(Math.max(0, Math.min(9999, n)));
   return short(n, SUF);
 }
-// grams under 1 kg, whole kg under 1 t, then tonnes: 1,25 t · 12,5 t · 340 t · 1,2 kt · 5,6 Mt
+// grams under 1 kg, whole kg under 10 t, then whole tonnes: 12 t · 340 t · 1 250 t · 25 kt …
 function kg(n) {
   if (!isFinite(n)) return '∞';
   if (n > 0 && Math.round(n * 1000) < 1000) return grp(n * 1000) + '\u00a0g';
-  if (n < 1000) return grp(Math.max(0, Math.min(999, n))) + '\u00a0kg';
-  const t = n / 1000;
-  if (t < 1000) return sig3(t) + '\u00a0t';
-  const w = short(t, [' kt', ' Mt', ' Gt']);
-  return w.replace(' ', '\u00a0');
+  if (n < 1e4) return grp(Math.max(0, Math.min(9999, n))) + '\u00a0kg';
+  return short(n / 1000, ['\u00a0kt', '\u00a0Mt', '\u00a0Gt']).replace(/(\d)$/, '$1\u00a0t');
 }
 const rm = n => '$' + fmt(n);
 const pct = m => m === 1 ? 'základ' : '+' + Math.round((m - 1) * 100) + '\u00a0%';
@@ -225,7 +229,10 @@ function person(g, x, y, s, o) {
   g.beginPath(); g.moveTo(x, y - 10 * s); g.lineTo(x - 3 * s * sw, y); g.moveTo(x, y - 10 * s); g.lineTo(x + 3 * s * sw, y); g.stroke();
   g.fillStyle = o.shirt; rrect(g, x - 4 * s, y - 20 * s, 8 * s, 11 * s, 2.5 * s); g.fill();
   g.fillStyle = '#a5826a'; g.beginPath(); g.arc(x, y - 23.5 * s, 3.2 * s, 0, 6.283); g.fill();
-  if (o.hat) { g.fillStyle = '#c8b58c'; g.beginPath(); g.moveTo(x - 8 * s, y - 24 * s); g.lineTo(x, y - 30 * s); g.lineTo(x + 8 * s, y - 24 * s); g.closePath(); g.fill();
+  if (o.vest) { g.fillStyle = o.vest; g.fillRect(x - 4 * s, y - 16 * s, 8 * s, 1.6 * s); g.fillRect(x - 1 * s, y - 20 * s, 2 * s, 11 * s); }
+  if (o.helmet) { g.fillStyle = o.helmet; g.beginPath(); g.arc(x, y - 24.5 * s, 3.9 * s, Math.PI, 0); g.fill(); g.fillRect(x - 5 * s, y - 24.8 * s, 10 * s, 1.2 * s);
+    if (o.visor) { g.fillStyle = o.visor; g.fillRect(x - 3.2 * s, y - 24 * s, 6.4 * s, 1.3 * s); } }
+  else if (o.hat) { g.fillStyle = '#c8b58c'; g.beginPath(); g.moveTo(x - 8 * s, y - 24 * s); g.lineTo(x, y - 30 * s); g.lineTo(x + 8 * s, y - 24 * s); g.closePath(); g.fill();
     g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(x - 8 * s, y - 24.4 * s, 16 * s, 1 * s); }
   if (o.carry) {
     const bx = x + o.dir * 5 * s, by = y - 14 * s;
@@ -275,13 +282,18 @@ function bagShape(g, x, y, sz, a) {
   g.fillStyle = sz === 25 ? '#ff7aa8' : sz === 50 ? '#7fd35c' : '#4aa8ff'; g.fillRect(x - w / 2, y - h + 3, w, 3);
   g.fillStyle = '#2b2b2e'; g.font = `700 ${Math.max(5, 6 * k * a)}px Inter,sans-serif`; g.textAlign = 'center'; g.fillText(sz, x, y - h * .62);
 }
-function scooter(g, x, y, s, dir, t, lit, col = '#4a4e55') {
+function scooter(g, x, y, s, dir, t, lit, col = '#4a4e55', tr = 0) {
   g.save(); g.translate(x, y); g.scale(dir * s, s);
+  if (tr >= 2) { const c = tr >= 3 ? '94,240,255' : '255,90,200'; glow(g, 0, -1, 24, c, .45); }
+  if (tr >= 3) col = '#1b2230';
   if (lit) { g.fillStyle = grad(g, 12, -8, 60, -8, [[0, 'rgba(255,235,190,.22)'], [1, 'rgba(255,235,190,0)']]); g.beginPath(); g.moveTo(12, -10); g.lineTo(60, -18); g.lineTo(60, 2); g.closePath(); g.fill(); }
-  g.fillStyle = '#111'; [-10, 10].forEach(wx => { g.beginPath(); g.arc(wx, -4, 4, 0, 6.283); g.fill(); });
-  g.strokeStyle = '#555'; g.lineWidth = 1; [-10, 10].forEach(wx => { g.beginPath(); g.arc(wx, -4, 2, t * 20, t * 20 + 3); g.stroke(); });
+  if (tr >= 3) { g.fillStyle = NEON; [-10, 10].forEach(wx => { rrect(g, wx - 5, -4 - Math.sin(t * 6) * .6, 10, 2.5, 1.2); g.fill(); }); }
+  else { g.fillStyle = '#111'; [-10, 10].forEach(wx => { g.beginPath(); g.arc(wx, -4, 4, 0, 6.283); g.fill(); }); }
+  g.strokeStyle = tr >= 3 ? 'rgba(0,0,0,0)' : '#555'; g.lineWidth = 1; [-10, 10].forEach(wx => { g.beginPath(); g.arc(wx, -4, 2, t * 20, t * 20 + 3); g.stroke(); });
   g.fillStyle = col; g.beginPath(); g.moveTo(-13, -6); g.quadraticCurveTo(-12, -14, -2, -13); g.lineTo(6, -13); g.lineTo(11, -18); g.lineTo(13, -16); g.lineTo(12, -6); g.closePath(); g.fill();
-  g.fillStyle = '#7f9a71'; rrect(g, -18, -22, 10, 9, 1.5); g.fill();
+  g.fillStyle = tr >= 1 ? ['', '#ffc857', '#e0533f', '#2a3446'][tr] : '#7f9a71'; rrect(g, -19, tr >= 1 ? -25 : -22, tr >= 1 ? 12 : 10, tr >= 1 ? 12 : 9, 1.5); g.fill();
+  if (tr >= 1) { g.fillStyle = tr >= 3 ? NEON : '#20160c'; g.fillRect(-17, -21, 8, 1.5); }
+  if (tr >= 3) { g.strokeStyle = NEON; g.lineWidth = 1; g.beginPath(); g.moveTo(-13, -6); g.lineTo(12, -6); g.stroke(); }
   g.fillStyle = '#2f3540'; rrect(g, -6, -24, 6, 11, 3); g.fill();
   g.fillStyle = '#ddd'; g.beginPath(); g.arc(-3, -27, 3.6, 0, 6.283); g.fill();
   g.fillStyle = '#222'; g.fillRect(-1, -28, 3, 2);
@@ -289,18 +301,34 @@ function scooter(g, x, y, s, dir, t, lit, col = '#4a4e55') {
   g.fillStyle = '#c2463c'; g.fillRect(-14, -9, 2, 2);
   g.restore();
 }
-function van(g, x, y, s, dir, t) {
+function van(g, x, y, s, dir, t, tr = 0) {
   g.save(); g.translate(x, y); g.scale(dir * s, s);
+  const VB = ['#d3d2cd', '#f2f0ea', '#1e2128', '#141a24'][tr], VC = ['#c6c5c0', '#e4e2dc', '#16181e', '#0e131b'][tr];
+  if (tr >= 3) glow(g, 0, -2, 46, '94,240,255', .35);
   g.fillStyle = grad(g, 26, -10, 80, -10, [[0, 'rgba(255,235,190,.2)'], [1, 'rgba(255,235,190,0)']]); g.beginPath(); g.moveTo(26, -12); g.lineTo(80, -22); g.lineTo(80, 2); g.closePath(); g.fill();
-  g.fillStyle = '#d3d2cd'; rrect(g, -26, -28, 38, 22, 3); g.fill();
-  g.fillStyle = '#c6c5c0'; g.beginPath(); g.moveTo(12, -24); g.lineTo(20, -24); g.lineTo(27, -14); g.lineTo(27, -6); g.lineTo(12, -6); g.closePath(); g.fill();
+  g.fillStyle = VB; rrect(g, -26, -28, 38, 22, 3); g.fill();
+  g.fillStyle = VC; g.beginPath(); g.moveTo(12, -24); g.lineTo(20, -24); g.lineTo(27, -14); g.lineTo(27, -6); g.lineTo(12, -6); g.closePath(); g.fill();
   g.fillStyle = '#1d2430'; g.beginPath(); g.moveTo(14, -22); g.lineTo(19.5, -22); g.lineTo(24, -15); g.lineTo(14, -15); g.closePath(); g.fill();
-  g.fillStyle = '#7f9a71'; g.fillRect(-24, -17, 34, 2);
+  g.fillStyle = ['#7f9a71', '#2aa58a', '#d9b45a', NEON][tr]; g.fillRect(-24, -17, 34, tr ? 3 : 2);
+  if (tr === 1) { g.fillStyle = '#2aa58a'; g.font = '800 8px "Baloo 2",sans-serif'; g.textAlign = 'center'; g.fillText('KETUM', -7, -20); }
+  if (tr >= 2) { g.fillStyle = tr >= 3 ? NEON : '#d9b45a'; g.font = '800 8px "Baloo 2",sans-serif'; g.textAlign = 'center'; g.fillText(tr >= 3 ? 'K·EXPRESS' : 'KE', -7, -20); }
   g.fillStyle = '#111'; [-16, 16].forEach(wx => { g.beginPath(); g.arc(wx, -5, 5, 0, 6.283); g.fill(); g.fillStyle = '#444'; g.beginPath(); g.arc(wx, -5, 2, 0, 6.283); g.fill(); g.fillStyle = '#111'; });
   g.fillStyle = '#fff1cc'; g.fillRect(25, -12, 2, 3); g.fillStyle = '#c2463c'; g.fillRect(-27, -14, 2, 4);
   g.restore();
 }
 /* ================= SCENES ================= */
+// every unit gets a new look as it levels: base → upgraded → pro → futuristic
+const TIER_LV = [0, 25, 50, 100], TIER_NAME = ['základní', 'vylepšený', 'profi', 'futuristický'];
+const tierOf = L => L >= 100 ? 3 : L >= 50 ? 2 : L >= 25 ? 1 : 0;
+const NEON = '#5ef0ff';
+function drone(g, x, y, s, t, seed) {
+  const hy = y + Math.sin(t * 3 + seed) * 2 * s;
+  glow(g, x, hy + 6 * s, 14 * s, '94,240,255', .25);
+  g.fillStyle = '#1b2230'; rrect(g, x - 6 * s, hy - 2 * s, 12 * s, 5 * s, 2 * s); g.fill();
+  g.strokeStyle = '#3a4456'; g.lineWidth = 1.2 * s; g.beginPath(); g.moveTo(x - 11 * s, hy - 2 * s); g.lineTo(x + 11 * s, hy - 2 * s); g.stroke();
+  g.fillStyle = 'rgba(200,240,255,.55)'; [-11, 11].forEach(dx => { g.beginPath(); g.ellipse(x + dx * s, hy - 3 * s, 5 * s * Math.abs(Math.sin(t * 40 + dx)), 1 * s, 0, 0, 6.283); g.fill(); });
+  g.fillStyle = NEON; g.beginPath(); g.arc(x, hy + 1 * s, 1.4 * s, 0, 6.283); g.fill();
+}
 const vis = { treeBorn: [0], lvPop: {}, leaves: [], parts: [], bags: [], coins: [], fx: [], grAngle: 0, belt: 0, bagAcc: 0, spawnBag: 0, coinBurst: 0, water: 0, grindKick: 0, treeHit: null };
 const popScale = key => { const t = vis.lvPop[key]; if (!t) return 1; const q = (performance.now() - t) / 1000; if (q > .7) { delete vis.lvPop[key]; return 1; } return 1 + .14 * Math.exp(-6 * q) * Math.sin(q * 20); };
 function dayCycle(t) { const p = ((t + 14) / 120) % 1, isDay = p < .74, q = isDay ? p / .74 : (p - .74) / .26; return { isDay, q, day: isDay ? Math.min(1, Math.sin(q * Math.PI) * 2.4) : 0 }; }
@@ -326,9 +354,9 @@ function drawLeaf(g, x, y, ang, len, wid, base, light, vein) {
   g.save(); g.translate(x, y); g.rotate(ang);
   leafPath(g, len, wid); g.fillStyle = base; g.fill();
   g.beginPath(); g.moveTo(0, 0); g.bezierCurveTo(len * .22, -wid, len * .72, -wid * .95, len, 0); g.closePath(); g.fillStyle = light; g.fill();
-  g.strokeStyle = vein; g.lineCap = 'round'; g.lineWidth = Math.max(.6, wid * .17);
+  g.strokeStyle = vein; g.lineCap = 'round'; g.lineWidth = Math.max(.35, wid * .14);
   g.beginPath(); g.moveTo(-len * .08, 0); g.lineTo(len * .9, 0); g.stroke();
-  if (len > 8) {
+  if (len > 14) {
     g.globalAlpha *= .55; g.lineWidth = Math.max(.4, wid * .08);
     for (let k = 1; k < 4; k++) { const px = len * k / 4.3; g.beginPath(); g.moveTo(px, 0); g.quadraticCurveTo(px + len * .08, -wid * .3, px + len * .16, -wid * .62); g.moveTo(px, 0); g.quadraticCurveTo(px + len * .08, wid * .3, px + len * .16, wid * .62); g.stroke(); }
   }
@@ -357,7 +385,7 @@ function kratomSprite(i, lv, ripe, day, s) {
   // branches
   const nb = 5 + Math.min(4, Math.floor(Math.log2(1 + lv)));
   const big = [lc('#17402a', '#33904a', day), lc('#22573a', '#5cbd5e', day)];
-  const young = [lc('#2e5c30', '#86cc5c', day), lc('#3a6c36', '#b6ea8a', day)];
+  const young = [lc('#28552c', '#4fa544', day), lc('#33653a', '#7cc95e', day)];
   const vein = lc(lc(VEIN[i][0], VEIN[i][1], .25 + day * .75), lc('#1d4529', '#46984c', day), .3);
   const leaves = [];
   for (let b = 0; b < nb; b++) {
@@ -381,9 +409,9 @@ function kratomSprite(i, lv, ripe, day, s) {
   leaves.sort((A, B) => A.d - B.d);
   for (const l of leaves) {
     const isRipe = R(l.seed) < ripe * 1.05;
-    const sc = isRipe ? .9 + R(l.seed + 3) * .25 : .5 + R(l.seed + 5) * .12;
+    const sc = isRipe ? .95 + R(l.seed + 3) * .25 : .66 + R(l.seed + 5) * .12;
     const col = isRipe ? big : young;
-    drawLeaf(g, l.x, l.y, l.a, 17 * s * sc, 6.6 * s * sc, col[0], col[1], vein);
+    drawLeaf(g, l.x, l.y, l.a, 19 * s * sc, 7.8 * s * sc, col[0], col[1], vein);
   }
   c = { cv: cvs, w: Wd, h: Hd, ox: bx, oy: by };
   treeCache.set(key, c); return c;
@@ -393,10 +421,31 @@ function kratom(g, x, y, s, born, i, t, day, ripe, lv, extraScale = 1) {
   const k = (gr < 1 ? .2 + .8 * eBack(gr) : 1) * extraScale;
   const sp = kratomSprite(i, lv, ripe, day, s);
   const sway = Math.sin(t * 1.1 + i * 1.7) * .035 + Math.sin(t * 2.7 + i) * .008 + (vis.water && performance.now() - vis.water < 600 ? Math.sin((performance.now() - vis.water) / 40) * .03 : 0);
+  const tr = tierOf(lv);
   g.fillStyle = 'rgba(10,30,10,.22)'; g.beginPath(); g.ellipse(x + 4 * s, y + 2, 34 * s * k, 7 * s * k, 0, 0, 6.283); g.fill();
+  if (tr >= 2) { // stone planter ring
+    g.fillStyle = tr >= 3 ? '#1c2533' : '#c9b48e'; g.beginPath(); g.ellipse(x, y, 26 * s * k, 7 * s * k, 0, 0, 6.283); g.fill();
+    g.fillStyle = tr >= 3 ? '#121924' : '#6b4f34'; g.beginPath(); g.ellipse(x, y - 1 * s, 21 * s * k, 5 * s * k, 0, 0, 6.283); g.fill();
+  }
+  if (tr >= 1) { // drip irrigation hose with droplets
+    g.strokeStyle = tr >= 3 ? NEON : '#2f86c9'; g.lineWidth = 1.6 * s; g.beginPath(); g.ellipse(x, y, 30 * s * k, 8 * s * k, 0, 0, 6.283); g.stroke();
+    for (let d = 0; d < 4; d++) { const a = d * 1.57 + t * .4, ph = (t * 1.3 + d * .25) % 1;
+      g.fillStyle = `rgba(150,210,255,${.8 * (1 - ph)})`; g.beginPath(); g.arc(x + Math.cos(a) * 30 * s * k, y + Math.sin(a) * 8 * s * k + ph * 4 * s, 1.3 * s, 0, 6.283); g.fill(); }
+  }
+  if (tr >= 3) { glow(g, x, y - 70 * s * k, 70 * s * k, '94,240,255', .14 + .05 * Math.sin(t * 2 + i)); }
   g.save(); g.translate(x, y); g.scale(k, k); g.transform(1, 0, sway, 1, 0, 0);
   g.drawImage(sp.cv, -sp.ox, -sp.oy, sp.w, sp.h);
   g.restore();
+  if (tr >= 2) { // grow lamp on a pole
+    const lx = x + 26 * s * k, ly = y - 86 * s * k;
+    g.strokeStyle = tr >= 3 ? '#2b3a4c' : '#5a5a60'; g.lineWidth = 1.8 * s; g.beginPath(); g.moveTo(lx, y + 1); g.lineTo(lx, ly); g.lineTo(lx - 8 * s, ly); g.stroke();
+    const lc2 = tr >= 3 ? '94,240,255' : '255,120,200';
+    glow(g, lx - 8 * s, ly + 3 * s, 16 * s, lc2, .45); g.fillStyle = `rgb(${lc2})`; rrect(g, lx - 13 * s, ly, 10 * s, 3 * s, 1.5 * s); g.fill();
+  }
+  if (tr >= 3) { // holo ring
+    const r = 24 * s * k, hy = y - 6 * s - Math.sin(t * 1.5 + i) * 3 * s;
+    g.strokeStyle = `rgba(94,240,255,${.55 + .25 * Math.sin(t * 3 + i)})`; g.lineWidth = 1.4 * s; g.beginPath(); g.ellipse(x, hy, r, r * .22, 0, 0, 6.283); g.stroke();
+  }
 }
 
 /* ---------- TROPICAL PROPS ---------- */
@@ -456,15 +505,27 @@ function hut(g, x, y, u, day) {
   [[-36, 2], [36, 2], [30, -4]].forEach(([dx, dy]) => { g.fillStyle = '#8a6440'; rrect(g, x + dx * u - 5 * u, y + dy * u - 7 * u, 10 * u, 7 * u, 1.5 * u); g.fill(); g.fillStyle = '#7fc25a'; g.beginPath(); g.ellipse(x + dx * u, y + dy * u - 7 * u, 4.5 * u, 2 * u, 0, 0, 6.283); g.fill(); });
 }
 function rack(g, x, y, w, u, day, owned, i, t) {
-  const top = y - 30 * u;
+  const top = y - 30 * u, tr = tierOf(S.lv.racks[i] || 0);
+  const P = [
+    [lc('#3a2a18', '#b8894a', day), lc('#2a1e10', '#8a6232', day), lc('#3a2a1c', '#c8954f', day), lc('#2a1e12', '#9a6a34', day)],
+    [lc('#2c3036', '#8a929c', day), lc('#22262c', '#6a7280', day), lc('#3a3f46', '#b4bcc6', day), lc('#2a2e34', '#7a828c', day)],
+    [lc('#2a3440', '#5f86a8', day), lc('#1e2630', '#46667f', day), lc('#3a4a5a', '#d6dee6', day), lc('#2a3a48', '#8aa0b4', day)],
+    ['#1a2230', '#121924', '#1d2a3a', NEON]][tr];
   g.fillStyle = 'rgba(40,60,20,.25)'; g.beginPath(); g.ellipse(x, y + 1, w * .55, 5 * u, 0, 0, 6.283); g.fill();
-  g.strokeStyle = lc('#3a2a18', '#b8894a', day); g.lineWidth = 3.4 * u; g.lineCap = 'round';
+  g.strokeStyle = P[0]; g.lineWidth = 3.4 * u; g.lineCap = 'round';
   g.beginPath(); g.moveTo(x - w / 2 + 6 * u, y); g.lineTo(x - w / 2 + 6 * u, top - 4 * u); g.moveTo(x + w / 2 - 6 * u, y); g.lineTo(x + w / 2 - 6 * u, top - 4 * u); g.stroke();
-  g.strokeStyle = lc('#2a1e10', '#8a6232', day); g.lineWidth = 1; [y - 8 * u, y - 18 * u].forEach(yy => { g.beginPath(); g.moveTo(x - w / 2 + 6 * u, yy); g.lineTo(x + w / 2 - 6 * u, yy + 2 * u); g.stroke(); });
+  g.strokeStyle = P[1]; g.lineWidth = 1; [y - 8 * u, y - 18 * u].forEach(yy => { g.beginPath(); g.moveTo(x - w / 2 + 6 * u, yy); g.lineTo(x + w / 2 - 6 * u, yy + 2 * u); g.stroke(); });
   const ps = popScale('racks' + i);
   g.save(); g.translate(x, top); g.scale(ps, ps);
-  g.fillStyle = lc('#3a2a1c', '#c8954f', day); rrect(g, -w / 2, -3 * u, w, 6 * u, 3 * u); g.fill();
-  g.strokeStyle = lc('#2a1e12', '#9a6a34', day); g.lineWidth = 1; for (let k = 1; k < 10; k++) { g.beginPath(); g.moveTo(-w / 2 + k * w / 10, -3 * u); g.lineTo(-w / 2 + k * w / 10, 3 * u); g.stroke(); }
+  if (tr >= 3) glow(g, 0, 6 * u, w * .55, '94,240,255', .22);
+  g.fillStyle = P[2]; rrect(g, -w / 2, -3 * u, w, 6 * u, 3 * u); g.fill();
+  if (tr >= 3) { g.strokeStyle = NEON; g.lineWidth = 1.4; rrect(g, -w / 2, -3 * u, w, 6 * u, 3 * u); g.stroke(); }
+  if (tr >= 2) { // solar panel roof
+    g.fillStyle = '#1f3c66'; g.beginPath(); g.moveTo(-w * .46, -16 * u); g.lineTo(w * .46, -20 * u); g.lineTo(w * .46, -15 * u); g.lineTo(-w * .46, -11 * u); g.closePath(); g.fill();
+    g.strokeStyle = tr >= 3 ? NEON : 'rgba(180,210,255,.5)'; g.lineWidth = .8; for (let k = 1; k < 6; k++) { const xx = -w * .46 + k * w * .92 / 6; g.beginPath(); g.moveTo(xx, -16 * u - k * .8 * u); g.lineTo(xx, -11 * u - k * .8 * u); g.stroke(); }
+    g.strokeStyle = P[0]; g.lineWidth = 1.5 * u; g.beginPath(); g.moveTo(-w * .4, -12 * u); g.lineTo(-w * .4, -3 * u); g.moveTo(w * .4, -16 * u); g.lineTo(w * .4, -3 * u); g.stroke();
+  }
+  g.strokeStyle = P[3]; g.lineWidth = 1; for (let k = 1; k < 10; k++) { g.beginPath(); g.moveTo(-w / 2 + k * w / 10, -3 * u); g.lineTo(-w / 2 + k * w / 10, 3 * u); g.stroke(); }
   const dryRatio = (S.dry + 1e-9) / (S.fresh + S.dry + 1e-9);
   const n = Math.min(14, Math.ceil(Math.log10(1 + (S.fresh + S.dry) * 10) * 4));
   for (let m = 0; m < n; m++) {
@@ -588,7 +649,10 @@ function drawFarm(g, t, dt) {
       x = lerp(from.x, to.x, e); y = lerp(from.y, to.y, e); dir = (to.x - from.x) * (ph < .5 ? 1 : -1) > 0 ? 1 : -1; full = ph < .5; walk = t * 10 + i;
       y -= Math.abs(Math.sin(walk)) * 1.5 * u;
     } else { x = from.x; y = from.y; }
-    draws.push({ y, f: () => { g.fillStyle = 'rgba(20,40,10,.25)'; g.beginPath(); g.ellipse(x, y + 1, 7 * u, 2 * u, 0, 0, 6.283); g.fill(); person(g, x, y, u * 1.15, { walk, dir, hat: true, shirt: ['#e0533f', '#2f86c9', '#e8a92c', '#2aa58a'][i], carry: true, carryFill: full }); } });
+    draws.push({ y, f: () => { g.fillStyle = 'rgba(20,40,10,.25)'; g.beginPath(); g.ellipse(x, y + 1, 7 * u, 2 * u, 0, 0, 6.283); g.fill(); const tr = tierOf(S.lv.pickers[i] || 0);
+      person(g, x, y, u * 1.15, { walk, dir, hat: true, shirt: tr >= 3 ? '#1d2a3a' : ['#e0533f', '#2f86c9', '#e8a92c', '#2aa58a'][i], carry: true, carryFill: full,
+        helmet: tr ? ['', '#ffc857', '#f6f0de', '#2b3a4c'][tr] : null, vest: tr >= 2 ? (tr >= 3 ? NEON : '#ffd23a') : null, visor: tr >= 3 ? NEON : null });
+      if (tr >= 3) drone(g, x + dir * 10 * u, y - 44 * u, u, t, i); } });
   }
   L.racks.forEach((o, i) => draws.push({ y: o.y, f: () => { if (S.lv.racks[i]) rack(g, o.x, o.y, o.w, u, day, true, i, t); else if (i === own('racks')) ghostOutline(g, o.x, o.y, o.w, 30 * u, u); } }));
   draws.sort((a, b) => a.y - b.y).forEach(d => d.f());
@@ -608,19 +672,24 @@ function drawFarm(g, t, dt) {
 
 /* ---------- WORKSHOP (beach shack) ---------- */
 function grinder(g, gx, gy, s, i, t, spin, owned) {
-  const ps = popScale('grinders' + i);
+  const ps = popScale('grinders' + i), tr = tierOf(S.lv.grinders[i] || 0);
+  const GC = [['#c7552f', '#e0663a', '#f58a4e', '#c9542c', '#8a3518'], ['#2f6a9a', '#3d7fb8', '#5c9ad0', '#2e6898', '#1d4466'],
+    ['#9aa4ae', '#c8d0d8', '#f2f5f8', '#a8b2bc', '#b8892c'], ['#141a24', '#1b2230', '#2a3446', '#141a24', NEON]][tr];
   g.save(); g.translate(gx, gy); g.scale(s * ps, s * ps);
   const jit = owned && spin ? Math.sin(t * 60 + i) * .6 : 0;
   g.fillStyle = 'rgba(0,0,0,.3)'; g.beginPath(); g.ellipse(0, 2, 54, 6, 0, 0, 6.283); g.fill();
-  g.fillStyle = '#c7552f'; g.beginPath(); g.moveTo(-34, -104 + jit); g.lineTo(34, -104 + jit); g.lineTo(15, -78 + jit); g.lineTo(-15, -78 + jit); g.closePath(); g.fill();
+  g.fillStyle = GC[0]; g.beginPath(); g.moveTo(-34, -104 + jit); g.lineTo(34, -104 + jit); g.lineTo(15, -78 + jit); g.lineTo(-15, -78 + jit); g.closePath(); g.fill();
   g.fillStyle = 'rgba(255,255,255,.18)'; g.beginPath(); g.moveTo(-34, -104 + jit); g.lineTo(-20, -104 + jit); g.lineTo(-8, -78 + jit); g.lineTo(-15, -78 + jit); g.closePath(); g.fill();
   const fill = clamp(Math.log10(1 + S.dry * 5) / 3);
   if (fill > .05 && owned) { g.fillStyle = '#8a7a55'; g.beginPath(); g.ellipse(0, -102 + jit, 30, 4 + fill * 5, 0, Math.PI, 0); g.fill(); }
-  g.fillStyle = grad(g, -40, 0, 40, 0, [[0, '#e0663a'], [.5, '#f58a4e'], [1, '#c9542c']]);
+  if (tr >= 3) glow(g, 0, -50 + jit, 70, '94,240,255', .18 + (spin ? .1 : 0));
+  g.fillStyle = grad(g, -40, 0, 40, 0, [[0, GC[1]], [.5, GC[2]], [1, GC[3]]]);
   rrect(g, -40, -80 + jit, 80, 64, 10); g.fill();
+  if (tr >= 2) { g.strokeStyle = GC[4]; g.lineWidth = tr >= 3 ? 2 : 3; rrect(g, -40, -80 + jit, 80, 64, 10); g.stroke(); }
+  if (tr >= 3) { g.strokeStyle = NEON; g.lineWidth = 1.5; g.beginPath(); g.moveTo(-34, -28 + jit); g.lineTo(34, -28 + jit); g.moveTo(-34, -58 + jit); g.lineTo(-18, -58 + jit); g.moveTo(18, -58 + jit); g.lineTo(34, -58 + jit); g.stroke(); }
   g.fillStyle = 'rgba(255,255,255,.22)'; rrect(g, -36, -76 + jit, 72, 8, 4); g.fill();
-  g.fillStyle = '#8a3518'; [[-34, -74], [34, -74], [-34, -22], [34, -22]].forEach(([bx, by]) => { g.beginPath(); g.arc(bx, by + jit, 1.8, 0, 6.283); g.fill(); });
-  g.fillStyle = '#20160c'; rrect(g, -14, -48 + jit, 28, 16, 3); g.fill(); g.fillStyle = '#ffc857'; g.font = '800 9px "Baloo 2",sans-serif'; g.textAlign = 'center'; g.fillText('K-0' + (i + 1), 0, -37 + jit);
+  g.fillStyle = GC[4]; [[-34, -74], [34, -74], [-34, -22], [34, -22]].forEach(([bx, by]) => { g.beginPath(); g.arc(bx, by + jit, 1.8, 0, 6.283); g.fill(); });
+  g.fillStyle = '#20160c'; rrect(g, -14, -48 + jit, 28, 16, 3); g.fill(); g.fillStyle = tr >= 3 ? NEON : '#ffc857'; g.font = '800 9px "Baloo 2",sans-serif'; g.textAlign = 'center'; g.fillText(['K-0', 'K-X', 'PRO-', 'Q-'][tr] + (i + 1), 0, -37 + jit);
   g.fillStyle = '#26272c'; rrect(g, -18, -16, 36, 10, 3); g.fill();
   const wx = 44, wy = -52 + jit, wr = 20;
   g.strokeStyle = '#3b3f46'; g.lineWidth = 4; g.beginPath(); g.arc(wx, wy, wr, 0, 6.283); g.stroke();
@@ -688,12 +757,16 @@ function drawProc(g, t, dt) {
   const beltSpd = flows.pack > 0 ? 40 + Math.min(80, Math.log10(1 + flows.pack) * 40) : (vis.spawnBag > 0 ? 70 : 0);
   vis.belt = (vis.belt + beltSpd * dt) % 16;
   g.strokeStyle = '#3a3a40'; g.lineWidth = 4 * u; g.beginPath(); [B.x0 + 14, (B.x0 + B.x1) / 2, B.x1 - 14].forEach(x => { g.moveTo(x, cy + 8); g.lineTo(x, cy + 40 * u); }); g.stroke();
-  g.fillStyle = '#ffc857'; rrect(g, B.x0 - 2, cy - 3 * u, B.x1 - B.x0 + 4, 4 * u, 2); g.fill();
+  const ptr = Math.max(0, ...S.lv.packers.map(tierOf));
+  if (ptr >= 3) glow(g, (B.x0 + B.x1) / 2, cy + 6 * u, (B.x1 - B.x0) * .55, '94,240,255', .16);
+  g.fillStyle = ['#ffc857', '#9aa4ae', '#e8eef4', NEON][ptr]; rrect(g, B.x0 - 2, cy - 3 * u, B.x1 - B.x0 + 4, 4 * u, 2); g.fill();
   g.fillStyle = '#1f2024'; rrect(g, B.x0, cy, B.x1 - B.x0, 12 * u, 6 * u); g.fill();
   g.strokeStyle = 'rgba(246,240,222,.12)'; g.lineWidth = 1.4; for (let x = B.x0 + 8 + vis.belt; x < B.x1 - 6; x += 16) { g.beginPath(); g.moveTo(x, cy + 2); g.lineTo(x - 4, cy + 10 * u); g.stroke(); }
   [B.x0 + 6 * u, B.x1 - 6 * u].forEach(rx => { g.fillStyle = '#4a4a52'; g.beginPath(); g.arc(rx, cy + 6 * u, 6 * u, 0, 6.283); g.fill(); const a = vis.belt / 16 * 6.283; g.strokeStyle = '#ffc857'; g.lineWidth = 1.4; g.beginPath(); g.moveTo(rx, cy + 6 * u); g.lineTo(rx + Math.cos(a) * 5 * u, cy + 6 * u + Math.sin(a) * 5 * u); g.stroke(); });
   const np = own('packers');
-  for (let i = 0; i < np; i++) person(g, B.x0 + (B.x1 - B.x0) * (.25 + i * .25), cy + 2, u * 1.2, { shirt: ['#2aa58a', '#e0533f', '#7a5cd6'][i], hat: i === 1, arm: flows.pack > 0 ? Math.abs(Math.sin(t * 7 + i * 1.3)) : 0 });
+  for (let i = 0; i < np; i++) { const tr = tierOf(S.lv.packers[i]), px = B.x0 + (B.x1 - B.x0) * (.25 + i * .25);
+    person(g, px, cy + 2, u * 1.2, { shirt: tr >= 3 ? '#1d2a3a' : tr >= 2 ? '#eef2f4' : ['#2aa58a', '#e0533f', '#7a5cd6'][i], hat: i === 1 && !tr, helmet: tr ? ['', '#ffc857', '#2f86c9', '#2b3a4c'][tr] : null, visor: tr >= 3 ? NEON : null, vest: tr === 1 ? '#ffd23a' : tr >= 3 ? NEON : null, arm: flows.pack > 0 ? Math.abs(Math.sin(t * 7 + i * 1.3)) : 0 });
+    if (tr >= 3) drone(g, px + 12 * u, cy - 40 * u, u, t, i + 5); }
   if (flows.pack > 0) vis.bagAcc += dt * Math.min(2.2, .6 + Math.log10(1 + flows.pack));
   while (vis.bagAcc >= 1) { vis.bagAcc--; vis.bags.push({ x: B.x0 + 12, sz: S.bag, drop: 0 }); }
   while (vis.spawnBag > 0) { vis.spawnBag--; vis.bags.push({ x: B.x0 + 12 - vis.bags.filter(b => b.x < B.x0 + 40).length * 22, sz: S.bag, drop: 0 }); }
@@ -814,14 +887,14 @@ function drawDist(g, t, dt) {
   garage(g, W * .86, L.walk - 2 * u, u, own('couriers') > 0 && flows.sell > 0);
   const selling = flows.sell > 0;
   const nd = own('dealers'), nc = own('couriers');
-  for (let k = 0; k < nd; k++) if (!selling) scooter(g, W * .5 + k * 22 * u, L.walk + 2 * u, u * 1.05, 1, t, false, ['#e0533f', '#2f86c9', '#e8a92c', '#2aa58a', '#9a6be0'][k]);
-  for (let k = 0; k < nc; k++) if (!selling) van(g, W * .86 + (k ? -30 : 0) * u, L.walk - 2 * u, u * 1.05, -1, t);
+  for (let k = 0; k < nd; k++) if (!selling) scooter(g, W * .5 + k * 22 * u, L.walk + 2 * u, u * 1.05, 1, t, false, ['#e0533f', '#2f86c9', '#e8a92c', '#2aa58a', '#9a6be0'][k], tierOf(S.lv.dealers[k]));
+  for (let k = 0; k < nc; k++) if (!selling) van(g, W * .86 + (k ? -30 : 0) * u, L.walk - 2 * u, u * 1.05, -1, t, tierOf(S.lv.couriers[k]));
   stall(g, L.stall.x, L.stall.y, u, t);
   // traffic in front of the cart
   if (selling) {
     for (let k = 0; k < nc; k++) {
       const dir = k % 2 ? -1 : 1, ph = (t * (.05 + k * .012) + k * .5) % 1, vx = dir > 0 ? lerp(-70, W + 70, ph) : lerp(W + 70, -70, ph);
-      van(g, vx, dir > 0 ? L.lane2 : L.lane1, u * 1.15, dir, t);
+      van(g, vx, dir > 0 ? L.lane2 : L.lane1, u * 1.15, dir, t, tierOf(S.lv.couriers[k]));
     }
     for (let k = 0; k < nd; k++) {
       const dir = k % 2 ? -1 : 1, col = ['#e0533f', '#2f86c9', '#e8a92c', '#2aa58a', '#9a6be0'][k];
@@ -829,7 +902,7 @@ function drawDist(g, t, dt) {
       const ph = (t * sp + k * .27) % 1, vx = dir > 0 ? lerp(-50, W + 50, ph) : lerp(W + 50, -50, ph);
       const vy = (dir > 0 ? L.lane2 : L.lane1) - Math.abs(Math.sin(t * 9 + k)) * .6;
       g.fillStyle = `rgba(${dir > 0 ? '255,240,200' : '255,80,80'},.08)`; g.beginPath(); g.ellipse(vx, vy + 4 * u, 30 * u, 4 * u, 0, 0, 6.283); g.fill();
-      scooter(g, vx, vy, u * 1.15, dir, t, true, col);
+      scooter(g, vx, vy, u * 1.15, dir, t, true, col, tierOf(S.lv.dealers[k]));
       if (Math.random() < dt * Math.min(3, .5 + flows.sell * .2)) vis.coins.push({ x: vx, y: vy - 34 * u, vy: -50, life: 1 });
     }
   }
@@ -855,6 +928,15 @@ function normalize(st) {
   o.lv = Object.assign(fresh().lv, (st && st.lv) || {});
   UNITS.forEach(u => { const a = o.lv[u.id]; while (a.length < u.max) a.push(0); a.length = u.max; });
   if (!o.lv.trees[0]) o.lv.trees[0] = 1;
+  o.ul = Object.assign({}, (st && st.ul) || {});
+  if (!(st && st.ul) && o.upg) {   // old saves: every bought one-off upgrade becomes one level of its line
+    for (const k of Object.keys(o.upg)) {
+      if (!o.upg[k]) continue;
+      const m = k.match(/^(price|heat|hand|cap)\d+$/), uid = !m && UNITS.find(u => k === u.id + k.slice(u.id.length) && /^\d+$/.test(k.slice(u.id.length)));
+      const key = m ? m[1] : uid ? 'u_' + uid.id : null;
+      if (key) o.ul[key] = (o.ul[key] | 0) + 1;
+    }
+  }
   return o;
 }
 function legacySave() {
@@ -993,7 +1075,7 @@ function computeLayout() {
     const tp = [[.22, .45], [.70, .42], [.38, .70], [.80, .69]];
     L.trees = tp.map(([x, y], i) => {
       const Lv = S.lv.trees[i] || 1;
-      return { x: W * x, y: F(y), s: Math.round(u * 1.16 * (.95 + Math.min(.4, Math.log10(Lv) * .25)) * 20) / 20 };
+      return { x: W * x, y: F(y), s: Math.round(u * .74 * (.95 + Math.min(.3, Math.log10(Lv) * .18)) * 20) / 20 };
     });
     L.racks = [.16, .5, .84].map(x => ({ x: W * x, y: F(.845), w: Math.min(W * .25, 110 * u) }));
     L.shed = { x: W * .86, y: F(.09) };
@@ -1087,7 +1169,7 @@ function updatePills(neck) {
       const bt = el.querySelector('b'); if (bt.textContent !== t) { bt.textContent = t; relayout = true; }
       el.classList.toggle('ok', c <= S.cash);
     } else {
-      const L = S.lv[p.id][p.i], n = buyAmt === 'max' ? Math.max(1, lvMax(u, L)) : buyAmt, c = lvCost(u, L, n);
+      const L = S.lv[p.id][p.i], n = buyAmt === 'max' ? Math.max(1, lvMax(u, L, p.i)) : buyAmt, c = lvCost(u, L, n, p.i);
       const lv = el.querySelector('.lv'), bt = el.querySelector('b');
       const lt = 'Lv' + L, ct = (n > 1 ? '+' + n + ' · ' : '') + fmt(c);
       if (lv.textContent !== lt) { lv.textContent = lt; relayout = true; }
@@ -1133,7 +1215,7 @@ function updateHint() {
 function hubAffordable(id) {
   const u = UBY[id], o = own(id);
   if (o < u.max && unlockCost(u, o) <= S.cash) return true;
-  return S.lv[id].some(L => L > 0 && lvCost(u, L, 1) <= S.cash);
+  return S.lv[id].some((L, i) => L > 0 && lvCost(u, L, 1, i) <= S.cash);
 }
 
 /* ================= ACTIONS ================= */
@@ -1148,11 +1230,12 @@ function slotAction(u, i) {
     vis.lvPop[u.id + i] = performance.now();
     toast(`${u.unit} ${i + 1} je tvůj`); vib([10, 20, 10]); layKey = ''; render(true); save(); return true;
   }
-  const n = buyAmt === 'max' ? lvMax(u, L) : buyAmt;
-  const c = lvCost(u, L, Math.max(1, n));
+  const n = buyAmt === 'max' ? lvMax(u, L, i) : buyAmt;
+  const c = lvCost(u, L, Math.max(1, n), i);
   if (n < 1 || c > S.cash) { toast(`Chybí ${rm(c - S.cash)}`); vib(4); return false; }
   S.cash -= c; S.lv[u.id][i] = L + n;
-  if (Math.floor((L + n) / MS) > Math.floor(L / MS)) toast(`${u.unit} ${i + 1}: Lv ${Math.floor((L + n) / MS) * MS}, rychlost +75 %`);
+  if (tierOf(L + n) > tierOf(L)) toast(`${u.unit} ${i + 1}: nový ${TIER_NAME[tierOf(L + n)]} vzhled`);
+  else if (Math.floor((L + n) / MS) > Math.floor(L / MS)) toast(`${u.unit} ${i + 1}: Lv ${Math.floor((L + n) / MS) * MS}, rychlost +75 %`);
   vis.lvPop[u.id + i] = performance.now();
   if (u.id === 'trees') layKey = '';
   vib(8); render(true); save(); return true;
@@ -1193,10 +1276,10 @@ function manual(o, ev) {
   S.taps++; floater(ev.clientX, ev.clientY, txt, cls); vib(5); render(true);
 }
 function buyUpg(id) {
-  const up = UPG.find(x => x.id === id);
-  if (!up || S.upg[id]) return;
-  if (S.cash < up.cost) { toast(`Chybí ${rm(up.cost - S.cash)}`); return; }
-  S.cash -= up.cost; S.upg[id] = 1; vib(12); toast(up.name + ' koupeno'); buildEmp(); render(true); save();
+  const up = UPBY[id]; if (!up) return;
+  const n = upLv(id), c = upCost(up, n);
+  if (S.cash < c) { toast(`Chybí ${rm(c - S.cash)}`); return; }
+  S.cash -= c; S.ul[id] = n + 1; vib(12); toast(`${upName(up, n)} · Lv ${n + 1}`); buildEmp(); render(true); save();
 }
 function buyLoc(i) {
   const L = LOCS[i];
@@ -1232,9 +1315,9 @@ function updateSheet() {
   for (let i = 0; i < u.max; i++) {
     const row = $('sr' + i), L = S.lv[id][i], btn = row.querySelector('button'), sp = row.querySelector('span'), lvb = row.querySelector('.lvb'), bar = row.querySelector('.bar');
     if (L) {
-      const n = buyAmt === 'max' ? Math.max(1, lvMax(u, L)) : buyAmt, c = lvCost(u, L, n);
+      const n = buyAmt === 'max' ? Math.max(1, lvMax(u, L, i)) : buyAmt, c = lvCost(u, L, n, i);
       row.className = 'slotrow'; lvb.innerHTML = `${L}<small>Lv</small>`;
-      sp.textContent = `${fmt(slotRate(id, L))} ${u.ru} · ${L % MS}/${MS} do bonusu`; bar.style.display = ''; bar.firstChild.style.width = (L % MS) / MS * 100 + '%';
+      const nt = TIER_LV[tierOf(L) + 1]; sp.textContent = `${fmt(slotRate(id, L, i))} ${u.ru} · ${L % MS}/${MS} do bonusu${nt ? ` · nový vzhled Lv ${nt}` : ''}`; bar.style.display = ''; bar.firstChild.style.width = (L % MS) / MS * 100 + '%';
       btn.innerHTML = `<small>+${n}</small>${COIN}${fmt(c)}`; btn.classList.toggle('ok', c <= S.cash); btn.disabled = false;
     } else if (i === o) {
       const c = unlockCost(u, i);
@@ -1277,10 +1360,10 @@ function buildEmp() {
       <circle cx="${x}" cy="${y}" r="${cur ? 8 : 6}" fill="${fill}" stroke="${nx ? '#ffc857' : '#0f1a1c'}" stroke-width="${nx ? 2 : 2}" ${nx ? 'stroke-dasharray="3 2"' : ''}/>
       <text x="${x + PIN_LBL[i][0]}" y="${y + PIN_LBL[i][1]}" text-anchor="${PIN_LBL[i][2]}" font-family="Baloo 2,sans-serif" font-weight="${cur ? 800 : 600}" font-size="${cur ? 13 : 11}" fill="${i <= S.loc + 1 ? '#f6f0de' : 'rgba(246,240,222,.4)'}">${L.n}</text></g>`;
   }).join('');
-  const open = UPG.filter(u => !S.upg[u.id]).slice(0, 12);
-  const doneN = UPG.length - UPG.filter(u => !S.upg[u.id]).length;
+  const open = UPG.map(u => ({ u, n: upLv(u.id), c: upCost(u, upLv(u.id)) })).sort((a, b) => a.c - b.c);
+  const doneN = UPG.reduce((a, u) => a + upLv(u.id), 0);
   const units = UNITS.reduce((a, u) => a + lvSum(u.id), 0);
-  const stats = [['Celkem vyděláno', rm(S.total)], ['Prodáno', kg(S.sold)], ['Sáčků prodáno', fint(S.bagsSold)], ['Levelů celkem', fmt(units)], ['Vylepšení', `${doneN}/${UPG.length}`], ['Razie', S.raids], ['Ruční akce', fmt(S.taps)], ['Hraješ', fmtTime(Date.now() - S.start)]];
+  const stats = [['Celkem vyděláno', rm(S.total)], ['Prodáno', kg(S.sold)], ['Sáčků prodáno', fint(S.bagsSold)], ['Levelů celkem', fmt(units)], ['Levely vylepšení', fmt(doneN)], ['Razie', S.raids], ['Ruční akce', fmt(S.taps)], ['Hraješ', fmtTime(Date.now() - S.start)]];
   const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
   $('emp').innerHTML = `
     <div class="prof"><div class="avatar" aria-hidden="true">${esc(initial(me.name))}</div><div class="grow"><b>${esc(me.name)}</b><span>${LOCS[S.loc].n} · ${fmtTime(Date.now() - S.start)} ve hře</span></div><button class="ghostbtn" id="logoutBtn">Odhlásit</button></div>
@@ -1298,7 +1381,7 @@ function buildEmp() {
       <button class="cta${S.cash >= next.cost ? ' ok' : ''}" id="locBtn">Expandovat ${COIN}${fmt(next.cost)}</button></div>`
       : `<div class="loccard"><h3>Ovládáš celou Malajsii</h3><p>Johor Bahru je tvoje. Vylepšuj dál a sleduj, jak čísla rostou.</p></div>`}
     <h2>Vylepšení</h2>
-    ${open.map(u => `<div class="upg"><div class="ui"><svg viewBox="0 0 24 24">${u.kind === 'unit' ? ICON[u.t] : UPG_ICON[u.kind]}</svg></div><div class="ut"><b>${u.name}</b><span>${u.desc}</span></div><button class="cta${S.cash >= u.cost ? ' ok' : ''}" data-u="${u.id}">${COIN}${fmt(u.cost)}</button></div>`).join('') || '<p class="sh-note">Všechno vylepšeno.</p>'}
+    ${open.map(({ u, n, c }) => `<div class="upg"><div class="ul${n ? '' : ' z'}"><b>${n}</b><small>Lv</small></div><div class="ut"><b>${upName(u, n)}</b><span>${u.eff(n)}</span></div><button class="cta${S.cash >= c ? ' ok' : ''}" data-u="${u.id}">${COIN}${fmt(c)}</button></div>`).join('')}
     <h2>Statistiky</h2>
     <div class="statgrid">${stats.map(([a, b]) => `<div class="stat"><span>${a}</span><b>${b}</b></div>`).join('')}</div>
     ${!standalone ? `<h2>Aplikace</h2><div class="loccard"><p>${deferredInstall ? 'Přidej hru na plochu a hraj na celou obrazovku i offline.' : 'Na iPhonu: Sdílet → Přidat na plochu. Na Androidu: menu prohlížeče → Instalovat aplikaci.'}</p>${deferredInstall ? '<button class="cta ok" id="installBtn">Nainstalovat aplikaci</button>' : ''}</div>` : ''}
@@ -1315,7 +1398,7 @@ function buildEmp() {
 }
 function updateEmp() {
   if (tab !== 'emp') return;
-  $('emp').querySelectorAll('[data-u]').forEach(b => { const u = UPG.find(x => x.id === b.dataset.u); b.classList.toggle('ok', S.cash >= u.cost); });
+  $('emp').querySelectorAll('[data-u]').forEach(b => { const u = UPBY[b.dataset.u]; b.classList.toggle('ok', S.cash >= upCost(u, upLv(u.id))); });
   const lb = $('locBtn'); if (lb) lb.classList.toggle('ok', S.cash >= LOCS[S.loc + 1].cost);
 }
 
@@ -1386,7 +1469,7 @@ function render(force) {
   updateSheet();
   if (force || now - lastSlow > 1000) {
     lastSlow = now; updateEmp();
-    $('empDot').classList.toggle('on', UPG.some(u => !S.upg[u.id] && S.cash >= u.cost) || (S.loc + 1 < LOCS.length && S.cash >= LOCS[S.loc + 1].cost));
+    $('empDot').classList.toggle('on', UPG.some(u => S.cash >= upCost(u, upLv(u.id))) || (S.loc + 1 < LOCS.length && S.cash >= LOCS[S.loc + 1].cost));
   }
 }
 function fmtTime(ms) { const m = Math.floor(ms / 6e4); return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h ' + (m % 60) + ' min'; }
@@ -1488,7 +1571,7 @@ if (location.hash === '#debug') window.__k = { L: () => LAY, S: () => S, tab: ()
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) navigator.serviceWorker.register('/sw.js').catch(() => {});
 (() => {
   const lastId = store.get(LK, null), p = profiles.find(x => x.id === lastId);
-  if (p && !p.pin) enter(p); else showLogin();
+  if (p) enter(p); else showLogin();   // stay signed in until you log out; the PIN only guards switching profiles
   requestAnimationFrame(t => { last = t; loop(t); });
 })();
 
