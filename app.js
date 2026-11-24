@@ -1053,14 +1053,18 @@ const cam = { x: 0, y: 0, z: 1 };
 const TR = { on: false };
 const easeIO = k => k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
 const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
-function wipe(color, from, to, ms) {
-  const w = $('wipe'); w.style.background = color;
-  return w.animate([{ opacity: from }, { opacity: to }], { duration: ms, easing: 'cubic-bezier(.23,1,.32,1)', fill: 'forwards' }).finished.catch(() => {});
+// the colour veil between map and scene; no fill-forwards, so inline opacity always wins afterwards
+function wipeStop() { const w = $('wipe'); if (w.getAnimations) w.getAnimations().forEach(a => a.cancel()); }
+function wipe(color, from, to, ms, done) {
+  const w = $('wipe'); wipeStop(); w.style.background = color; w.style.opacity = String(to);
+  if (w.animate) w.animate([{ opacity: from }, { opacity: to }], { duration: ms, easing: 'cubic-bezier(.23,1,.32,1)' });
+  if (done) setTimeout(done, ms);
 }
 function goTo(target) {
   if (TR.on || tab !== 'map') return;
   vib(6);
   if (reduceMotion()) { setTab(target); return; }
+  wipeStop();
   Object.assign(TR, { on: true, dir: 1, t0: performance.now(), dur: 560, target, p: placeXY(target) });
   $('hot').style.opacity = '0';
 }
@@ -1072,11 +1076,12 @@ function backToMap() {
   TR.on = true;
   const el = from === 'emp' ? $('emp') : $('cv');
   el.animate([{ transform: 'scale(1)' }, { transform: 'scale(.93)' }], { duration: 200, easing: 'cubic-bezier(.55,0,1,.45)' });
-  wipe(PLACE[from].tint, 0, 1, 200).then(() => {
-    setTab('map');
+  wipe(PLACE[from].tint, 0, 1, 200, () => {
+    wipeStop(); setTab('map');
     Object.assign(TR, { dir: -1, t0: performance.now(), dur: 620, target: from, p: placeXY(from) });
     $('hot').style.opacity = '0';
   });
+  setTimeout(() => { if (TR.on && tab !== 'map') { TR.on = false; wipeStop(); $('wipe').style.opacity = '0'; setTab('map'); } }, 1500);   // safety net
 }
 function stepCamera(now) {
   if (!TR.on || tab !== 'map') { cam.x = W / 2; cam.y = H / 2; cam.z = 1; return; }
