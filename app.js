@@ -1326,7 +1326,7 @@ function enter(p) {
   loginOn = false;
   $('login').classList.add('hidden'); $('app').classList.remove('hidden');
   S.xpLv = xpLevel(S.total); paintLevel();
-  setTab('map');
+  setTab('farm');
   requestAnimationFrame(() => { resize(); offline(); render(true); });
 }
 function logout() { save(); store.del(LK); showLogin(); }
@@ -1360,10 +1360,9 @@ function resize() {
   cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
   const inv = $('inv').getBoundingClientRect();
   TOP = Math.max(140, inv.bottom - r.top + 44); // leaves a row for the event ribbon
-  BOT = ($('sabProbe').offsetHeight || 0) + 66;   // room for the back button row above the home indicator
   layKey = '';
 }
-let BOT = 70;
+let BOT = 12;
 const F = fy => TOP + fy * (H - TOP - BOT);
 function computeLayout() {
   const u = Math.min(W / 390, (H - TOP) / 600);
@@ -1512,14 +1511,9 @@ function updateHint() {
   if (S.tutDone || tab === 'emp' || !LAY) { el.className = ''; return; }
   const H0 = HINTS[nextNeed()];
   if (H0.tab !== tab) {
-    if (TR.on) { el.className = ''; return; }
-    const st = $('stage').getBoundingClientRect();
-    let b, txt;
-    if (tab === 'map') { const p = LAY.pills.find(q => q.id === H0.tab); b = p && p.el.getBoundingClientRect(); txt = `Pokračuj: ${TAB_NAME[H0.tab]}`; }
-    else { b = $('backBtn').getBoundingClientRect(); txt = `Zpět na mapu → ${TAB_NAME[H0.tab]}`; }
-    if (!b) { el.className = ''; return; }
-    el.textContent = txt; el.className = 'on';
-    el.style.transform = `translate(${Math.round(clamp(b.left + b.width / 2 - st.left, 90, W - 90))}px,${Math.round(b.top - st.top - 8)}px) translate(-50%,-100%)`;
+    const b = document.querySelector(`#nav button[data-v="${H0.tab}"]`).getBoundingClientRect(), st = $('stage').getBoundingClientRect();
+    el.textContent = `Pokračuj: ${TAB_NAME[H0.tab]}`; el.className = 'on down';
+    el.style.transform = `translate(${Math.round(clamp(b.left + b.width / 2 - st.left, 70, W - 70))}px,${Math.round(H - 10)}px) translate(-50%,-100%)`;
     return;
   }
   const p = H0.at(); if (!p) { el.className = ''; return; }
@@ -1745,7 +1739,7 @@ function buildEmp() {
   if ($('installBtn')) $('installBtn').onclick = async () => { deferredInstall.prompt(); await deferredInstall.userChoice.catch(() => {}); deferredInstall = null; buildEmp(); };
   let armed = 0;
   $('resetBtn').onclick = () => {
-    if (Date.now() - armed < 3000) { S = normalize(null); vis.treeBorn = [0]; save(); toast('Postup smazán'); setTab('map'); return; }
+    if (Date.now() - armed < 3000) { S = normalize(null); vis.treeBorn = [0]; save(); toast('Postup smazán'); setTab('farm'); return; }
     armed = Date.now(); $('resetBtn').textContent = 'Ťukni znovu pro potvrzení';
   };
 }
@@ -1790,14 +1784,14 @@ function setTab(t) {
   tab = t; closeSheet();
   $('emp').classList.toggle('hidden', t !== 'emp');
   ['hud', 'inv', 'ribbon', 'hot'].forEach(id => $(id).classList.toggle('hidden', t === 'emp'));
-  $('amt').classList.toggle('hidden', t === 'emp' || t === 'map');
-  $('backBtn').classList.toggle('hidden', t === 'map');
+  document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('on', b.dataset.v === t));
+  $('amt').classList.toggle('hidden', t === 'emp');
   $('hot').style.opacity = '';
   if (t === 'emp') { buildEmp(); $('emp').scrollTop = 0; }
   layKey = ''; render(true);
 }
-$('backBtn').onclick = backToMap;
-$('avatarBtn').onclick = () => { if (tab === 'map') goTo('emp'); else if (tab !== 'emp') { setTab('emp'); $('emp').animate([{ opacity: 0, transform: 'scale(1.04)' }, { opacity: 1, transform: 'scale(1)' }], { duration: 300, easing: 'cubic-bezier(.23,1,.32,1)' }); } };
+$('nav').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { setTab(b.dataset.v); vib(4); } });
+$('avatarBtn').onclick = () => setTab('emp');
 $('heatBtn').onclick = layLowNow;
 $('amt').onclick = () => {
   const seq = [1, 10, 100, 'max']; buyAmt = seq[(seq.indexOf(buyAmt) + 1) % seq.length];
@@ -1856,7 +1850,7 @@ function render(force) {
   updateSheet();
   if (force || now - lastSlow > 1000) {
     lastSlow = now; updateEmp();
-    $('avatarBtn').classList.toggle('alert', empAlert());
+    $('empDot').classList.toggle('on', empAlert());
     paintLevel();
   }
 }
