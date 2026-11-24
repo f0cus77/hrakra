@@ -18,7 +18,7 @@ const ICON = {
 };
 // max = slots, base = unlock/level base cost, k = level cost growth, sm = slot unlock multiplier, r0 = rate per power
 const UNITS = [
-  { id: 'trees',    tab: 'farm', title: 'Kratomový sad',    unit: 'Strom',   max: 4, base: 15,   k: 1.20, sm: 25, r0: .15, ru: 'kg/s', tap: 'Zalít' },
+  { id: 'trees',    tab: 'farm', title: 'Kratomový sad',    unit: 'Strom',   max: 2, base: 15,   k: 1.20, sm: 25, r0: .15, ru: 'kg/s', tap: 'Zalít' },
   { id: 'pickers',  tab: 'farm', title: 'Sběrači',          unit: 'Sběrač',  max: 4, base: 50,   k: 1.21, sm: 25, r0: .25, ru: 'kg/s', tap: 'Sklidit' },
   { id: 'racks',    tab: 'farm', title: 'Sušárna',          unit: 'Lísa',    max: 3, base: 120,  k: 1.22, sm: 35, r0: .20, ru: 'kg/s', tap: 'Usušit' },
   { id: 'grinders', tab: 'proc', title: 'Drcení',           unit: 'Drtička', max: 2, base: 300,  k: 1.23, sm: 120, r0: .15, ru: 'kg/s', tap: 'Podrtit' },
@@ -28,7 +28,7 @@ const UNITS = [
 ];
 const UBY = Object.fromEntries(UNITS.map(u => [u.id, u]));
 const MS = 10; // every 10 levels a slot gets ×1.75 speed
-const BAG = { 25: { prem: 1.6, scale: .72 }, 50: { prem: 1.25, scale: .86 }, 100: { prem: 1, scale: 1.04 } };
+const BAG = { 25: { prem: 1.6, scale: .72 }, 50: { prem: 1.25, scale: .86 }, 100: { prem: 1.25, scale: 1.04 } };
 const PRICE_KG = 120;
 
 const LOCS = [
@@ -72,6 +72,30 @@ function upCost(up, n) {
 }
 function upName(up, n) { const k = up.names.length, r = Math.floor(n / k) + 1; return up.names[n % k] + (r > 1 ? (ROMAN[r] || ' ' + r) : ''); }
 
+// beyond the street: your own brand grows into a distributor, a franchise and an export empire
+const BRAND = [
+  { n: 'Vlastní značka', d: 'Logo, etikety a jméno, které lidi poznají. Odemkne síť prodejen.', cost: 5e8, eff: 'Cena sáčku ×2', price: 2 },
+  { n: 'Distributor', d: 'Velkoobchod: tvoje zboží berou obchody po celé zemi.', cost: 5e10, eff: 'Prodej ×3', sell: 3 },
+  { n: 'Franšíza', d: 'Prodejny pod tvou značkou provozují jiní a platí ti podíl.', cost: 5e12, eff: 'Příjem prodejen ×4', shop: 4 },
+  { n: 'Export', d: 'Kontejnery do Thajska, Indonésie a na Filipíny.', cost: 5e14, eff: 'Cena sáčku ×3', price: 3 },
+  { n: 'Globální značka', d: 'Tvoje logo v každém přístavu Asie.', cost: 5e16, eff: 'Všechno ×5', price: 5, sell: 1, shop: 5 }
+];
+const brandMult = k => BRAND.slice(0, S.brand).reduce((m, b) => m * (b[k] || 1), 1);
+const SHOPS = [
+  { n: 'Alor Setar', xy: [72, 46], lb: [10, 4, 'start'] }, { n: 'George Town', xy: [50, 72], lb: [10, 4, 'start'] }, { n: 'Ipoh', xy: [88, 122], lb: [10, 4, 'start'] },
+  { n: 'Kota Bharu', xy: [166, 50], lb: [0, -10, 'middle'] }, { n: 'Kuala Terengganu', xy: [180, 98], lb: [-9, -7, 'end'] }, { n: 'Kuantan', xy: [168, 158], lb: [-10, 4, 'end'] },
+  { n: 'Kuala Lumpur', xy: [104, 190], lb: [10, 4, 'start'] }, { n: 'Seremban', xy: [122, 214], lb: [10, 4, 'start'] }, { n: 'Melaka', xy: [134, 240], lb: [10, 4, 'start'] },
+  { n: 'Johor Bahru', xy: [168, 278], lb: [-10, 4, 'end'] }
+];
+const shopCost = j => 1e8 * Math.pow(6, j);
+const shopLvCost = (j, L, n = 1) => { const c0 = shopCost(j) * .25 * Math.pow(1.16, L - 1); return c0 * (Math.pow(1.16, n) - 1) / .16; };
+const shopRate = (j, L) => L > 0 ? shopCost(j) * .004 * lvPow(L) * brandMult('shop') * xpMult() : 0;
+const shopIncome = () => S.brand ? S.shops.reduce((a, L, j) => a + shopRate(j, L), 0) : 0;
+// boss level from lifetime earnings; every level adds 5 % to the bag price
+const xpLevel = tot => 1 + Math.floor(Math.log(1 + tot / 50) / Math.log(1.9));
+const xpAt = L => 50 * (Math.pow(1.9, L - 1) - 1);
+const xpMult = () => Math.pow(1.05, xpLevel(S.total) - 1);
+
 const EVENTS = [
   { id: 'monsoon', txt: 'Monzun — sušení −50 %', dur: 60, cls: 'bad' },
   { id: 'buyer',   txt: 'Odběratel z Thajska — cena ×2', dur: 45, cls: 'good' },
@@ -82,8 +106,8 @@ const EVENTS = [
 
 /* ================= STATE ================= */
 const fresh = () => ({
-  cash: 15, onTree: 3, fresh: 0, dry: 0, powder: 0, b25: 0, b50: 0, b100: 0, bag: 50,
-  lv: { trees: [1, 0, 0, 0], pickers: [0, 0, 0, 0], racks: [0, 0, 0], grinders: [0, 0], packers: [0, 0, 0], dealers: [0, 0, 0, 0, 0], couriers: [0, 0] },
+  cash: 15, onTree: 3, fresh: 0, dry: 0, powder: 0, b25: 0, b50: 0, b100: 0, bag: 100, brand: 0, shops: [], xpLv: 1,
+  lv: { trees: [1, 0], pickers: [0, 0, 0, 0], racks: [0, 0, 0], grinders: [0, 0], packers: [0, 0, 0], dealers: [0, 0, 0, 0, 0], couriers: [0, 0] },
   upg: {}, ul: {}, loc: 0, heat: 0, layUntil: 0, layCd: 0, ev: null, nextEv: Date.now() + 120e3,
   total: 0, taps: 0, raids: 0, sold: 0, bagsSold: 0, start: Date.now(), t: Date.now()
 });
@@ -107,7 +131,7 @@ function umult(id) {
   return Math.pow(2, upLv('u_' + id)) * LOCS[S.loc].mult;
 }
 const handMult = () => Math.pow(3, cnt('hand')) * LOCS[S.loc].mult;
-const priceKg = () => PRICE_KG * LOCS[S.loc].price * Math.pow(1.5, cnt('price')) * (evOn('buyer') ? 2 : 1);
+const priceKg = () => PRICE_KG * LOCS[S.loc].price * Math.pow(1.5, cnt('price')) * brandMult('price') * xpMult() * (evOn('buyer') ? 2 : 1);
 const bagPrice = sz => sz / 1000 * priceKg() * BAG[sz].prem;
 const cap = () => Math.max(4, power('trees') * 6 * Math.pow(2, cnt('cap')) * LOCS[S.loc].mult);
 const heatMult = () => Math.pow(.7, cnt('heat')) * LOCS[S.loc].heat * (evOn('patrol') ? 2 : 1);
@@ -121,7 +145,7 @@ function caps() {
     dry: unitRate('racks') * (evOn('monsoon') ? .5 : 1),
     grind: unitRate('grinders'),
     pack: unitRate('packers'),
-    sell: layLow() ? 0 : (unitRate('dealers') + unitRate('couriers')) * (evOn('rush') ? 2 : 1)
+    sell: layLow() ? 0 : (unitRate('dealers') + unitRate('couriers')) * brandMult('sell') * (evOn('rush') ? 2 : 1)
   };
 }
 function unitRate(id) { return power(id) * UBY[id].r0 * umult(id); }
@@ -129,13 +153,13 @@ function slotRate(id, L, i) { return slotM(UBY[id], i) * lvPow(L) * UBY[id].r0 *
 function lvCost(u, L, n, i) { const c0 = u.base * costM(u, i) * Math.pow(u.k, L - 1); return c0 * (Math.pow(u.k, n) - 1) / (u.k - 1); }
 function lvMax(u, L, i) { const c0 = u.base * costM(u, i) * Math.pow(u.k, L - 1); return Math.max(0, Math.floor(Math.log(S.cash * (u.k - 1) / c0 + 1) / Math.log(u.k))); }
 function unlockCost(u, i) { return u.base * (i === 0 ? 1 : Math.pow(u.sm, i)); }
-// every number is whole: full below 10 000, then a whole number + suffix kept under 10 000 (12k, 147k, 1 250k, 25M …)
+// every number is whole: full below 10 000, then at most three digits + suffix (12k, 147k, 1M, 25M, 340B …)
 const grp = n => Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0');
 const SUF = ['k', 'M', 'B', 'T', 'Qa', 'Qi', 'Sx', 'Sp', 'Oc', 'No', 'Dc'];
 // cut, never rounded up, so a balance never looks bigger than it is
 function short(n, units) {
   let i = -1, m = n;
-  while (m >= 1e4 && i < units.length - 1) { m /= 1000; i++; }
+  while (m >= 1000 && i < units.length - 1) { m /= 1000; i++; }
   return grp(Math.floor(m + 1e-9)) + (i < 0 ? '' : units[i]);
 }
 function fmt(n) {
@@ -148,7 +172,7 @@ function kg(n) {
   if (!isFinite(n)) return '∞';
   if (n > 0 && Math.round(n * 1000) < 1000) return grp(n * 1000) + '\u00a0g';
   if (n < 1e4) return grp(Math.max(0, Math.min(9999, n))) + '\u00a0kg';
-  return short(n / 1000, ['\u00a0kt', '\u00a0Mt', '\u00a0Gt']).replace(/(\d)$/, '$1\u00a0t');
+  return short(n / 1000, ['\u00a0kt', '\u00a0Mt', '\u00a0Gt', '\u00a0Tt']).replace(/(\d)$/, '$1\u00a0t');
 }
 const rm = n => '$' + fmt(n);
 const pct = m => m === 1 ? 'základ' : '+' + Math.round((m - 1) * 100) + '\u00a0%';
@@ -184,8 +208,9 @@ function tick(dt, offline) {
   S.heat = Math.max(0, S.heat - heatDecay() * (layLow() ? 6 : 1) * dt);
   if (offline) S.heat = Math.min(S.heat, 90);
   else if (S.heat >= 100) raid();
+  const shopEarn = shopIncome() * dt; if (shopEarn > 0) { S.cash += shopEarn; S.total += shopEarn; }
   if (dt > 0) flows = { grow: g / dt, pick: p / dt, dry: d / dt, grind: gr / dt, pack: pk / dt, sell: r.sold / dt };
-  return r.earn;
+  return r.earn + shopEarn;
 }
 function raid() {
   if (!S.warned) {
@@ -926,8 +951,21 @@ const saveKey = id => 'ketum_save_' + id;
 function normalize(st) {
   const o = Object.assign(fresh(), st || {});
   o.lv = Object.assign(fresh().lv, (st && st.lv) || {});
-  UNITS.forEach(u => { const a = o.lv[u.id]; while (a.length < u.max) a.push(0); a.length = u.max; });
+  UNITS.forEach(u => { const a = o.lv[u.id] = (o.lv[u.id] || []).slice(); while (a.length < u.max) a.push(0); if (u.id !== 'trees') a.length = u.max; });
   if (!o.lv.trees[0]) o.lv.trees[0] = 1;
+  // only 100 g bags now: older bag stock is repacked
+  o.b100 = (o.b100 || 0) + (o.b25 || 0) / 4 + (o.b50 || 0) / 2; o.b25 = 0; o.b50 = 0; o.bag = 100;
+  // only two trees now: the extra trees' output is folded into tree 2 as levels
+  if (st && st.lv && st.lv.trees && st.lv.trees.length > 2) {
+    const tu = UBY.trees, old = st.lv.trees; let P = 0;
+    old.forEach((L, i) => { if (i >= 1 && L > 0) P += slotM(tu, i) * lvPow(L); });
+    let L1 = Math.max(old[1] | 0, P > 0 ? 1 : 0);
+    while (P > 0 && slotM(tu, 1) * lvPow(L1) < P && L1 < 5000) L1++;
+    o.lv.trees = [Math.max(1, old[0] | 0), L1];
+  }
+  o.lv.trees.length = 2;
+  o.shops = Array.from({ length: SHOPS.length }, (_, i) => (o.shops && o.shops[i]) | 0);
+  o.brand = o.brand | 0;
   o.ul = Object.assign({}, (st && st.ul) || {});
   if (!(st && st.ul) && o.upg) {   // old saves: every bought one-off upgrade becomes one level of its line
     for (const k of Object.keys(o.upg)) {
@@ -1030,7 +1068,7 @@ function enter(p) {
   Object.assign(vis, { treeBorn: Array(own('trees')).fill(0), lvPop: {}, leaves: [], parts: [], bags: [], coins: [], fx: [] });
   loginOn = false;
   $('login').classList.add('hidden'); $('app').classList.remove('hidden');
-  $('avatarBtn').textContent = initial(p.name);
+  S.xpLv = xpLevel(S.total); paintLevel();
   setTab('farm');
   requestAnimationFrame(() => { resize(); offline(); render(true); });
 }
@@ -1072,7 +1110,7 @@ function computeLayout() {
   const u = Math.min(W / 390, (H - TOP) / 600);
   const L = { u, objs: [], pills: [] };
   if (tab === 'farm') {
-    const tp = [[.22, .45], [.70, .42], [.38, .70], [.80, .69]];
+    const tp = [[.28, .52], [.72, .47]];
     L.trees = tp.map(([x, y], i) => {
       const Lv = S.lv.trees[i] || 1;
       return { x: W * x, y: F(y), s: Math.round(u * .74 * (.95 + Math.min(.3, Math.log10(Lv) * .18)) * 20) / 20 };
@@ -1132,9 +1170,8 @@ function buildPills() {
   }
   if (tab === 'proc') {
     const bg = document.createElement('div'); bg.id = 'bags';
-    bg.innerHTML = [25, 50, 100].map(sz => `<button data-b="${sz}" aria-label="Balit po ${sz} g"><svg viewBox="0 0 20 24" width="${14 + sz / 12}" height="${17 + sz / 10}"><path d="M3 4h14l1 18H2z" fill="#ecebe7"/><rect x="5" y="10" width="10" height="7" rx="1.5" fill="#a5a07c"/><rect x="3" y="4" width="14" height="2" fill="#5f9a45"/></svg>${sz} g<small></small></button>`).join('');
+    bg.innerHTML = `<div class="bag1"><svg viewBox="0 0 20 24" width="26" height="30"><path d="M3 4h14l1 18H2z" fill="#ecebe7"/><rect x="5" y="10" width="10" height="7" rx="1.5" fill="#a5a07c"/><rect x="3" y="4" width="14" height="2" fill="#5f9a45"/></svg><div><b>Sáček 100 g</b><small></small></div></div>`;
     bg.style.left = '12px'; bg.style.top = (TOP + 2) + 'px';
-    bg.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; S.bag = +b.dataset.b; vib(6); render(true); });
     hot.appendChild(bg);
   }
   placePills(true);
@@ -1180,7 +1217,7 @@ function updatePills(neck) {
   }
   if (relayout) placePills();
   const bg = $('bags');
-  if (bg) bg.querySelectorAll('button').forEach(b => { const sz = +b.dataset.b; b.classList.toggle('on', sz === S.bag); b.querySelector('small').textContent = '$' + fmt(bagPrice(sz)); });
+  if (bg) { const t = rm(bagPrice(100)) + ' za kus'; const sm = bg.querySelector('small'); if (sm.textContent !== t) sm.textContent = t; }
 }
 const HINTS = {
   harvest: { tab: 'farm', text: 'Ťukni na strom: sklizeň', at: () => { const o = LAY.objs.find(x => x.k === 'tree'); return o && [o.x + o.w / 2, o.y + 6]; } },
@@ -1349,6 +1386,33 @@ const PIN_XY = [[72, 52], [80, 112], [156, 62], [40, 80], [100, 196], [170, 276]
 const PIN_LBL = [[10, 4, 'start'], [10, 4, 'start'], [0, 22, 'middle'], [10, 4, 'start'], [10, 4, 'start'], [-12, 4, 'end']];
 let deferredInstall = null;
 addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredInstall = e; });
+function brandCard() {
+  const steps = BRAND.map((b, i) => `<i class="${i < S.brand ? 'on' : i === S.brand ? 'nx' : ''}"></i>`).join('');
+  const done = BRAND.slice(0, S.brand).map(b => b.n).join(' → ');
+  const nb = BRAND[S.brand];
+  return `<div class="loccard brand"><div class="steps">${steps}</div>
+    ${done ? `<p class="bdone">${done}</p>` : ''}
+    ${nb ? `<h3>${nb.n}</h3><p>${nb.d}</p><div class="stats3"><span><b>${nb.eff}</b></span></div>
+      <button class="cta${S.cash >= nb.cost ? ' ok' : ''}" id="brandBtn">${S.brand ? 'Rozšířit značku' : 'Založit značku'} ${COIN}${fmt(nb.cost)}</button>`
+      : `<h3>Globální značka je tvoje</h3><p>Vylepšuj prodejny a sleduj, jak čísla rostou.</p>`}</div>`;
+}
+function shopMap() {
+  const pins = SHOPS.map((sh, j) => {
+    const [x, y] = sh.xy, L = S.shops[j], nx = !L && (j === 0 || S.shops[j - 1]);
+    return `<g>${L ? `<rect x="${x - 6}" y="${y - 6}" width="12" height="12" rx="3" fill="#ffc857" stroke="#0f1a1c" stroke-width="2"/><path d="M${x - 3} ${y - 1}h6v4h-6z" fill="#0f1a1c"/>`
+      : `<rect x="${x - 5}" y="${y - 5}" width="10" height="10" rx="3" fill="${nx ? 'rgba(255,200,87,.2)' : 'rgba(246,240,222,.12)'}" stroke="${nx ? '#ffc857' : 'rgba(246,240,222,.25)'}" stroke-width="1.5" ${nx ? 'stroke-dasharray="3 2"' : ''}/>`}
+      <text x="${x + sh.lb[0]}" y="${y + sh.lb[1]}" text-anchor="${sh.lb[2]}" font-family="Baloo 2,sans-serif" font-weight="${L ? 800 : 600}" font-size="10" fill="${L ? '#f6f0de' : 'rgba(246,240,222,.45)'}">${sh.n}${L ? ' · ' + L : ''}</text></g>`;
+  }).join('');
+  return `<div class="mapwrap"><svg viewBox="0 0 240 300" role="img" aria-label="Mapa tvých prodejen">
+    <path d="M58 22C86 12 124 16 152 22c20 4 34 20 32 42-3 22-14 38-17 58-3 25 5 50 13 80 8 30 14 55 4 75-10 18-32 18-42 6-12-18-22-40-35-58C93 205 81 191 73 171c-10-24-14-50-18-72-4-20-14-38-12-56 2-14 8-19 15-21z" fill="#1d3b2f" stroke="rgba(154,214,114,.35)" stroke-width="1.5"/>
+    ${pins}</svg></div>`;
+}
+function shopRow(j) {
+  const L = S.shops[j], c = shopNext(j), open = isFinite(c);
+  return `<div class="upg${open ? '' : ' off'}"><div class="ul${L ? '' : ' z'}"><b>${L}</b><small>Lv</small></div>
+    <div class="ut"><b>${SHOPS[j].n}</b><span>${L ? `${rm(shopRate(j, L))}/s · další level +${rm(shopRate(j, L + 1) - shopRate(j, L))}/s` : open ? `Nová prodejna · ${rm(shopRate(j, 1))}/s` : 'Nejdřív předchozí město'}</span></div>
+    ${open ? `<button class="cta${S.cash >= c ? ' ok' : ''}" data-s="${j}">${COIN}${fmt(c)}</button>` : ''}</div>`;
+}
 function buildEmp() {
   if (tab !== 'emp' || !me) return;
   const next = LOCS[S.loc + 1];
@@ -1366,7 +1430,7 @@ function buildEmp() {
   const stats = [['Celkem vyděláno', rm(S.total)], ['Prodáno', kg(S.sold)], ['Sáčků prodáno', fint(S.bagsSold)], ['Levelů celkem', fmt(units)], ['Levely vylepšení', fmt(doneN)], ['Razie', S.raids], ['Ruční akce', fmt(S.taps)], ['Hraješ', fmtTime(Date.now() - S.start)]];
   const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
   $('emp').innerHTML = `
-    <div class="prof"><div class="avatar" aria-hidden="true">${esc(initial(me.name))}</div><div class="grow"><b>${esc(me.name)}</b><span>${LOCS[S.loc].n} · ${fmtTime(Date.now() - S.start)} ve hře</span></div><button class="ghostbtn" id="logoutBtn">Odhlásit</button></div>
+    <div class="prof"><div class="avatar" aria-hidden="true">${esc(initial(me.name))}</div><div class="grow"><b>${esc(me.name)}</b><span>Šéf Lv ${xpLevel(S.total)} · ${LOCS[S.loc].n} · cena +${fmt((xpMult() - 1) * 100)} %</span></div><button class="ghostbtn" id="logoutBtn">Odhlásit</button></div>
     <h2>Mapa impéria</h2>
     <div class="mapwrap"><svg viewBox="0 0 240 300" role="img" aria-label="Mapa Malajsie s tvými lokacemi">
       <defs><pattern id="wv" width="16" height="10" patternUnits="userSpaceOnUse"><path d="M0 5q4-3 8 0t8 0" fill="none" stroke="rgba(246,240,222,.06)" stroke-width="1"/></pattern></defs>
@@ -1380,6 +1444,9 @@ function buildEmp() {
       <div class="stats3"><span>Produkce <b>×${next.mult}</b></span><span>Cena <b>${pct(next.price)}</b></span><span>Policie <b>${pct(next.heat)}</b></span></div>
       <button class="cta${S.cash >= next.cost ? ' ok' : ''}" id="locBtn">Expandovat ${COIN}${fmt(next.cost)}</button></div>`
       : `<div class="loccard"><h3>Ovládáš celou Malajsii</h3><p>Johor Bahru je tvoje. Vylepšuj dál a sleduj, jak čísla rostou.</p></div>`}
+    <h2>Značka</h2>
+    ${brandCard()}
+    ${S.brand ? `<h2>Moje prodejny <span class="h2s" id="shopInc">${rm(shopIncome())}/s</span></h2>${shopMap()}<div class="shops">${SHOPS.map((sh, j) => shopRow(j)).join('')}</div>` : ''}
     <h2>Vylepšení</h2>
     ${open.map(({ u, n, c }) => `<div class="upg"><div class="ul${n ? '' : ' z'}"><b>${n}</b><small>Lv</small></div><div class="ut"><b>${upName(u, n)}</b><span>${u.eff(n)}</span></div><button class="cta${S.cash >= c ? ' ok' : ''}" data-u="${u.id}">${COIN}${fmt(c)}</button></div>`).join('')}
     <h2>Statistiky</h2>
@@ -1387,6 +1454,8 @@ function buildEmp() {
     ${!standalone ? `<h2>Aplikace</h2><div class="loccard"><p>${deferredInstall ? 'Přidej hru na plochu a hraj na celou obrazovku i offline.' : 'Na iPhonu: Sdílet → Přidat na plochu. Na Androidu: menu prohlížeče → Instalovat aplikaci.'}</p>${deferredInstall ? '<button class="cta ok" id="installBtn">Nainstalovat aplikaci</button>' : ''}</div>` : ''}
     <button class="danger" id="resetBtn">Smazat postup profilu ${esc(me.name)}</button>`;
   $('logoutBtn').onclick = logout;
+  if ($('brandBtn')) $('brandBtn').onclick = buyBrand;
+  $('emp').querySelectorAll('[data-s]').forEach(b => b.onclick = () => buyShop(+b.dataset.s));
   if ($('locBtn')) $('locBtn').onclick = () => buyLoc(S.loc + 1);
   $('emp').querySelectorAll('[data-u]').forEach(b => b.onclick = () => buyUpg(b.dataset.u));
   if ($('installBtn')) $('installBtn').onclick = async () => { deferredInstall.prompt(); await deferredInstall.userChoice.catch(() => {}); deferredInstall = null; buildEmp(); };
@@ -1396,10 +1465,37 @@ function buildEmp() {
     armed = Date.now(); $('resetBtn').textContent = 'Ťukni znovu pro potvrzení';
   };
 }
+function paintLevel() {
+  const L = xpLevel(S.total), a = xpAt(L), b = xpAt(L + 1), f = clamp((S.total - a) / Math.max(1, b - a));
+  const el = $('avatarBtn'), t = String(L);
+  if (el.dataset.l !== t) { el.dataset.l = t; el.innerHTML = `<b>${L}</b><small>Lv</small>`; el.setAttribute('aria-label', `Úroveň šéfa ${L}, impérium`); }
+  el.style.setProperty('--xp', (f * 100).toFixed(1) + '%');
+  if (L > (S.xpLv || 1)) {
+    S.xpLv = L; vis.lvPop.boss = performance.now();
+    toast(`Úroveň šéfa ${L} · cena sáčku +5 %`); vib([10, 30, 10]); el.classList.remove('lvup'); void el.offsetWidth; el.classList.add('lvup');
+  }
+}
+function buyBrand() {
+  const b = BRAND[S.brand]; if (!b) return;
+  if (S.cash < b.cost) { toast(`Chybí ${rm(b.cost - S.cash)}`); return; }
+  S.cash -= b.cost; S.brand++; vib([20, 30, 20]); toast(`${b.n}: ${b.eff}`); buildEmp(); render(true); save();
+}
+function buyShop(j) {
+  if (!S.brand) return;
+  const L = S.shops[j];
+  if (!L && j > 0 && !S.shops[j - 1]) return;
+  const c = L ? shopLvCost(j, L) : shopCost(j);
+  if (S.cash < c) { toast(`Chybí ${rm(c - S.cash)}`); return; }
+  S.cash -= c; S.shops[j] = L + 1; vib(L ? 8 : [10, 20, 10]); toast(L ? `${SHOPS[j].n}: Lv ${L + 1}` : `Nová prodejna: ${SHOPS[j].n}`); buildEmp(); render(true); save();
+}
+function shopNext(j) { const L = S.shops[j]; return L ? shopLvCost(j, L) : (j === 0 || S.shops[j - 1] ? shopCost(j) : Infinity); }
 function updateEmp() {
   if (tab !== 'emp') return;
   $('emp').querySelectorAll('[data-u]').forEach(b => { const u = UPBY[b.dataset.u]; b.classList.toggle('ok', S.cash >= upCost(u, upLv(u.id))); });
   const lb = $('locBtn'); if (lb) lb.classList.toggle('ok', S.cash >= LOCS[S.loc + 1].cost);
+  const bb = $('brandBtn'); if (bb) bb.classList.toggle('ok', S.cash >= BRAND[S.brand].cost);
+  $('emp').querySelectorAll('[data-s]').forEach(b => b.classList.toggle('ok', S.cash >= shopNext(+b.dataset.s)));
+  const si = $('shopInc'); if (si) si.textContent = rm(shopIncome()) + '/s';
 }
 
 /* ================= TABS ================= */
@@ -1446,7 +1542,7 @@ function render(force) {
   let inv = '';
   if (tab === 'farm') inv = `<div class="chip"><i style="background:#1d3b2f">${ICO_LEAF}</i>${kg(S.onTree)}<span>strom</span></div><div class="chip"><i style="background:#1d3b2f">${ICO_LEAF}</i>${kg(S.fresh)}<span>čerstvé</span></div><div class="chip"><i style="background:#3a2e1f">${ICO_DRY}</i>${kg(S.dry)}<span>suché</span></div>`;
   else if (tab === 'proc') inv = `<div class="chip"><i style="background:#3a2e1f">${ICO_DRY}</i>${kg(S.dry)}<span>suché</span></div><div class="chip"><i style="background:#3a3524">${ICO_POW}</i>${kg(S.powder)}<span>prášek</span></div><div class="chip"><i style="background:#2b3a36">${ICO_BAG}</i>${fint(bagsTotal())}<span>sáčků</span></div>`;
-  else if (tab === 'dist') inv = `<div class="chip"><i style="background:#2b3a36">${ICO_BAG}</i>${fint(S.b25)}×<span>25 g</span></div><div class="chip"><i style="background:#2b3a36">${ICO_BAG}</i>${fint(S.b50)}×<span>50 g</span></div><div class="chip"><i style="background:#2b3a36">${ICO_BAG}</i>${fint(S.b100)}×<span>100 g</span></div>`;
+  else if (tab === 'dist') inv = `<div class="chip"><i style="background:#2b3a36">${ICO_BAG}</i>${fint(bagsTotal())}×<span>100 g</span></div><div class="chip"><i style="background:#3a3524">${ICO_POW}</i>${rm(bagPrice(100))}<span>za sáček</span></div>${own('dealers') ? '' : ''}${S.brand ? `<div class="chip"><i style="background:#3a2a4a">${ICO_BAG}</i>${S.shops.filter(x => x > 0).length}<span>prodejen</span></div>` : ''}`;
   if (inv !== invKey) { $('inv').innerHTML = inv; invKey = inv; }
   // event ribbon
   const rb = $('ribbon');
@@ -1469,7 +1565,8 @@ function render(force) {
   updateSheet();
   if (force || now - lastSlow > 1000) {
     lastSlow = now; updateEmp();
-    $('empDot').classList.toggle('on', UPG.some(u => S.cash >= upCost(u, upLv(u.id))) || (S.loc + 1 < LOCS.length && S.cash >= LOCS[S.loc + 1].cost));
+    $('empDot').classList.toggle('on', UPG.some(u => S.cash >= upCost(u, upLv(u.id))) || (S.loc + 1 < LOCS.length && S.cash >= LOCS[S.loc + 1].cost) || (S.brand < BRAND.length && S.cash >= BRAND[S.brand].cost) || (S.brand > 0 && SHOPS.some((_, j) => S.cash >= shopNext(j))));
+    paintLevel();
   }
 }
 function fmtTime(ms) { const m = Math.floor(ms / 6e4); return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h ' + (m % 60) + ' min'; }

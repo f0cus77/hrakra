@@ -235,6 +235,23 @@ nav button .dot.on{display:block}
 }
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
 }
+.avatar{position:relative;flex-direction:column;line-height:1;background:radial-gradient(circle at 50% 50%,var(--jungle) 62%,transparent 63%),conic-gradient(var(--gold) var(--xp,0%),rgba(246,240,222,.14) 0);border:0}
+.avatar b{font-size:17px;font-weight:800}
+.avatar small{font-size:9px;font-weight:700;color:var(--leaf);margin-top:-1px}
+.avatar.lvup{animation:lvup .6s var(--ease-out)}
+@keyframes lvup{30%{transform:scale(1.18)}100%{transform:scale(1)}}
+.prof .avatar{background:var(--jungle);border:2px solid var(--leaf)}
+#bags .bag1{display:flex;align-items:center;gap:10px;padding:6px 12px 6px 8px;border-radius:12px;background:var(--cream);color:var(--ink)}
+#bags .bag1 b{display:block;font-size:15px;font-weight:800;line-height:1.1}
+#bags .bag1 small{display:block;font-size:12px;font-weight:700;color:#6b5f45}
+.h2s{float:right;font-size:15px;color:var(--leaf);margin-top:4px}
+.brand .steps{display:flex;gap:6px;margin-bottom:10px}
+.brand .steps i{flex:1;height:6px;border-radius:99px;background:rgba(246,240,222,.12)}
+.brand .steps i.on{background:var(--leaf)}
+.brand .steps i.nx{background:rgba(255,200,87,.45)}
+.brand .bdone{margin:0 0 8px;font-size:13px;font-weight:700;color:var(--leaf)}
+.shops{margin-top:10px}
+.upg.off{opacity:.5}
 </style></head><body><section id="login" aria-label="Přihlášení"><canvas id="lcv" aria-hidden="true"></canvas><div class="lbox"><h1 class="logo">Ketum<span>Empire</span></h1>
 <p class="tag">Zasaď první strom v Kedahu a postav impérium až do Johor Bahru.</p>
 <div class="lpanel"><div id="lpList"><h2 id="lpListH">Pokračovat jako</h2>
